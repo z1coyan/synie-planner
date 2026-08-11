@@ -38,3 +38,22 @@ const COLOR_COLUMN := Color(0.45, 0.45, 0.52, 1.0)
 const COLOR_DEVICE := Color(0.35, 0.65, 0.95, 1.0)
 const COLOR_OK := Color(0.15, 0.95, 0.30, 0.35)
 const COLOR_BAD := Color(0.95, 0.20, 0.20, 0.35)
+
+const FLOOR_COUNT := 4
+const FLOOR_HEIGHT := 5.0
+const FLOOR_THICKNESS := 0.3
+const FLOOR_TOP_OFFSET := 0.3
+const FLOOR_SIZE := Vector2(90.0, 50.0)
+const SLAB_CELL := 0.5
+
+const COLOR_FLOOR := Color(0.52, 0.52, 0.56, 1.0)
+const COLOR_FLOOR_GRID := Color(0.34, 0.35, 0.38, 1.0)
+const COLOR_OPENING := Color(0.95, 0.7, 0.2, 1.0)
+
+const OPENING_TYPES := [
+	{"name": "吊装孔", "size": Vector2(3.0, 3.0)},
+	{"name": "输送井", "size": Vector2(2.0, 2.0)},
+]
+const OPENING_SIZE_MIN := 0.5
+const OPENING_SIZE_MAX := 20.0
+const OPENING_SIZE_STEP := 0.5

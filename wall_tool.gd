@@ -2,16 +2,18 @@ class_name WallTool
 extends Node3D
 
 ## 墙体：连续点击绘制，起点/终点有可视化标记，实时显示长度，[ ] 调整墙厚。
-## 放置严格使用预览时的数据，保证所见即所得。
+## 墙面基准高度取起点所在表面，自动归属楼层。
 
 var world: WorldStore
 var camera_rig: CameraController
 var hud: Hud
+var floors: FloorManager
 
 var active := false
 var drawing := false
 var start_point: Vector3
 var thickness := Config.WALL_THICKNESS_DEFAULT
+var base_y := 0.0
 
 var _preview_root: Node3D
 var _fill_mi: MeshInstance3D
@@ -29,10 +31,11 @@ var _preview_yaw := 0.0
 var _preview_ok := false
 var _preview_end := Vector3.ZERO
 
-func setup(w: WorldStore, cc: CameraController, h: Hud) -> void:
+func setup(w: WorldStore, cc: CameraController, h: Hud, fm: FloorManager) -> void:
 	world = w
 	camera_rig = cc
 	hud = h
+	floors = fm
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
 	_preview_root = Node3D.new()
@@ -78,6 +81,9 @@ func set_active(a: bool) -> void:
 		hud.set_status("画墙：连续点击端点，实时显示长度")
 		_update_hud()
 
+func cancel() -> void:
+	_cancel()
+
 func _cancel() -> void:
 	drawing = false
 	start_point = Vector3.ZERO
@@ -92,7 +98,7 @@ func _physics_process(_delta: float) -> void:
 	if not active:
 		return
 	if drawing:
-		_start_marker.position = Vector3(start_point.x, 0.11, start_point.z)
+		_start_marker.position = Vector3(start_point.x, base_y + 0.11, start_point.z)
 		_start_marker.visible = true
 	var aim := world.aim_surface(camera_rig)
 	if aim.is_empty():
@@ -100,7 +106,8 @@ func _physics_process(_delta: float) -> void:
 		_end_marker.visible = false
 		return
 	var snapped := _snap_grid(aim["point"])
-	_end_marker.position = Vector3(snapped.x, 0.11, snapped.z)
+	var mark_y: float = (base_y if drawing else aim["surface_y"]) + 0.11
+	_end_marker.position = Vector3(snapped.x, mark_y, snapped.z)
 	_end_marker.visible = true
 	if drawing:
 		_update_preview(snapped)
@@ -120,7 +127,11 @@ func _update_preview(end_point: Vector3) -> void:
 	var length := between.length()
 	var yaw := -atan2(between.z, between.x)
 	var size := Vector3(length, Config.WALL_HEIGHT, thickness)
-	var center := Vector3((start_point.x + end_point.x) * 0.5, Config.WALL_HEIGHT * 0.5, (start_point.z + end_point.z) * 0.5)
+	var center := Vector3(
+		(start_point.x + end_point.x) * 0.5,
+		base_y + Config.WALL_HEIGHT * 0.5,
+		(start_point.z + end_point.z) * 0.5,
+	)
 	var bs := BoxShape3D.new()
 	bs.size = size
 	var ok := world.shape_clear(bs, Transform3D(Basis(Vector3.UP, yaw), center), 0.0, [], "wall")
@@ -147,6 +158,8 @@ func _show_preview(center: Vector3, size: Vector3, yaw: float, ok: bool) -> void
 func _unhandled_input(event: InputEvent) -> void:
 	if not active:
 		return
+	if get_viewport().gui_get_focus_owner() != null:
+		return
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_BRACKETRIGHT:
 			thickness = clampf(thickness + Config.WALL_THICKNESS_STEP, Config.WALL_THICKNESS_MIN, Config.WALL_THICKNESS_MAX)
@@ -171,6 +184,7 @@ func _on_left_click() -> void:
 	var snapped := _snap_grid(aim["point"])
 	if not drawing:
 		start_point = snapped
+		base_y = aim["surface_y"]
 		drawing = true
 		_last_size = Vector3.ZERO
 		_preview_ok = false
@@ -178,7 +192,7 @@ func _on_left_click() -> void:
 		return
 	if not _preview_ok or not _preview_root.visible:
 		return
-	world.place_box(_preview_center, _preview_size, Config.COLOR_WALL, "wall", _preview_yaw)
+	world.place_box(_preview_center, _preview_size, Config.COLOR_WALL, "wall", _preview_yaw, floors.floor_from_y(base_y))
 	start_point = _preview_end
 	_last_size = Vector3.ZERO
 	_preview_ok = false

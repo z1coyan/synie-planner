@@ -32,7 +32,7 @@ func setup(cc: CameraController) -> void:
 	vb.add_child(title)
 
 	var hint := Label.new()
-	hint.text = "Tab 视角切换 · 1/2/3 工具 · R 旋转 · F 飞行"
+	hint.text = "Tab 视角 · 1/2/3/4 工具 · 5-8 楼层 · 9 全层 · B 元素库"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(hint)
 

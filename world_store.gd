@@ -6,12 +6,13 @@ extends Node3D
 var content: Node3D
 var ground_body: StaticBody3D
 var placed: Array = []
+var labels_visible := true
 
 func setup(content_parent: Node3D, ground: StaticBody3D) -> void:
 	content = content_parent
 	ground_body = ground
 
-func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: float = 0.0) -> StaticBody3D:
+func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: float = 0.0, floor: int = 0, name: String = "") -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.name = "%s_%d" % [kind, body.get_instance_id()]
 	body.position = cx
@@ -43,9 +44,35 @@ func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: floa
 	body.set_meta("size", size)
 	body.set_meta("color", color)
 	body.set_meta("yaw", yaw)
+	body.set_meta("floor", floor)
+	if kind == "device":
+		body.set_meta("name", name if name != "" else "设备")
+		_add_label(body, size, body.get_meta("name"))
 	content.add_child(body)
 	placed.append(body)
 	return body
+
+func _add_label(body: StaticBody3D, size: Vector3, text: String) -> void:
+	var label := Label3D.new()
+	label.name = "Label"
+	label.text = text
+	label.font_size = 48
+	label.pixel_size = 0.0035
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.position = Vector3(0.0, size.y * 0.5 + 0.35, 0.0)
+	label.modulate = Color(0.95, 0.98, 1.0, 0.95)
+	label.outline_size = 12
+	label.outline_modulate = Color(0.05, 0.05, 0.1, 0.9)
+	label.visible = labels_visible
+	body.add_child(label)
+
+func toggle_labels() -> void:
+	labels_visible = not labels_visible
+	for obj in placed:
+		if obj.has_meta("name"):
+			var l: Node = obj.get_node_or_null("Label")
+			if l != null:
+				l.visible = labels_visible
 
 func top_surface_y(body: Node3D) -> float:
 	if body == ground_body:

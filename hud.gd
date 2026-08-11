@@ -4,6 +4,7 @@ extends CanvasLayer
 var _status: Label
 var _tool_info: Label
 var _length: Label
+var _floor: Label
 var _hint: Label
 
 func setup() -> void:
@@ -16,11 +17,17 @@ func setup() -> void:
 	_status = _make_label("")
 	_tool_info = _make_label("")
 	_length = _make_label("")
-	_hint = _make_label("Tab 视角切换  1 墙  2 柱  3 设备  R 旋转  F 飞行  Esc 取消")
+	_floor = _make_label("")
+	_hint = _make_label("")
 	_status.add_theme_font_size_override("font_size", 18)
+	_floor.add_theme_font_size_override("font_size", 18)
+	_floor.add_theme_color_override("font_color", Color(0.45, 0.9, 1.0))
+	_hint.text = "Tab 视角  1墙 2柱 3设备 4开洞  5-8楼层 9全层  R旋转  F飞行\n" \
+		+ "[ ]/Q/E 调尺寸  B元素库  T标签  L贯通  Y开洞类型  Esc菜单"
 	vb.add_child(_status)
 	vb.add_child(_tool_info)
 	vb.add_child(_length)
+	vb.add_child(_floor)
 	vb.add_child(_hint)
 	add_child(panel)
 
@@ -40,3 +47,6 @@ func set_tool_info(text: String) -> void:
 
 func set_length(text: String) -> void:
 	_length.text = text
+
+func set_floor_text(text: String) -> void:
+	_floor.text = text

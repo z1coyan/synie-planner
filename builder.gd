@@ -2,11 +2,13 @@ class_name Builder
 extends Node3D
 
 ## 柱子 / 设备放置：全息预览跟随鼠标，0.5m 网格吸附 + 表面吸附，
-## R 键旋转 90°，绿=可放，红=干涉。
+## R 键旋转 90°，绿=可放，红=干涉。设备尺寸/颜色取自元素库，自动归属楼层。
 
 var world: WorldStore
 var camera_rig: CameraController
 var hud: Hud
+var floors: FloorManager
+var library: ElementLibrary
 
 var tool := "none"          # "none" | "column" | "device"
 var rot_steps := 0           # 0..3 → 旋转 0/90/180/270°
@@ -19,10 +21,12 @@ var _fill_mat_ok: StandardMaterial3D
 var _fill_mat_bad: StandardMaterial3D
 var _last_size := Vector3.ZERO
 
-func setup(w: WorldStore, cc: CameraController, h: Hud) -> void:
+func setup(w: WorldStore, cc: CameraController, h: Hud, fm: FloorManager, lib: ElementLibrary) -> void:
 	world = w
 	camera_rig = cc
 	hud = h
+	floors = fm
+	library = lib
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
 	_preview_root = Node3D.new()
@@ -33,6 +37,10 @@ func setup(w: WorldStore, cc: CameraController, h: Hud) -> void:
 	_wire_mi = MeshInstance3D.new()
 	_preview_root.add_child(_fill_mi)
 	_preview_root.add_child(_wire_mi)
+
+func refresh_device() -> void:
+	_last_size = Vector3.ZERO
+	_update_hud()
 
 func _holo_mat(base: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -58,7 +66,7 @@ func _current_size() -> Vector3:
 	if tool == "column":
 		s = Vector3(Config.COLUMN_WIDTH, Config.COLUMN_HEIGHT, Config.COLUMN_DEPTH)
 	else:
-		s = Config.DEVICE_SIZE
+		s = library.current_device()["size"]
 	if rot_steps % 2 == 1:
 		s = Vector3(s.z, s.y, s.x)
 	return s
@@ -66,7 +74,12 @@ func _current_size() -> Vector3:
 func _current_color() -> Color:
 	if tool == "column":
 		return Config.COLOR_COLUMN
-	return Config.COLOR_DEVICE
+	return library.current_device()["color"]
+
+func _current_name() -> String:
+	if tool == "column":
+		return ""
+	return String(library.current_device()["name"])
 
 func _physics_process(_delta: float) -> void:
 	if tool == "none":
@@ -121,6 +134,8 @@ func _build_wire(box_size: Vector3) -> ImmediateMesh:
 	return im
 
 func _unhandled_input(event: InputEvent) -> void:
+	if get_viewport().gui_get_focus_owner() != null:
+		return
 	if event is InputEventKey and event.pressed and tool != "none":
 		if event.keycode == KEY_R:
 			rot_steps = (rot_steps + 1) % 4
@@ -138,14 +153,18 @@ func _place() -> void:
 	if not _preview_root.visible:
 		return
 	var size := _current_size()
-	world.place_box(_preview_root.position, size, _current_color(), tool)
+	var bottom_y := _preview_root.position.y - size.y * 0.5
+	var floor := floors.floor_from_y(bottom_y)
+	world.place_box(_preview_root.position, size, _current_color(), tool, 0.0, floor, _current_name())
 
 func _update_hud() -> void:
 	var name_map := {"none": "无", "column": "柱子", "device": "设备"}
 	if tool == "none":
 		hud.set_tool_info("")
 		return
-	hud.set_tool_info("%s   旋转:%d°   尺寸:%.1f×%.1f×%.1f m" % [
-		name_map[tool], rot_steps * 90, _current_size().x, _current_size().y, _current_size().z,
-	])
-	hud.set_status("放置：%s（绿色可放 / 红色干涉）" % name_map[tool])
+	var label := "%s  旋转:%d°  尺寸:%.1f×%.1f×%.1f m" % [
+		_current_name() if tool == "device" else name_map[tool],
+		rot_steps * 90, _current_size().x, _current_size().y, _current_size().z,
+	]
+	hud.set_tool_info(label)
+	hud.set_status("放置：%s（绿色可放 / 红色干涉，R 旋转）" % (_current_name() if tool == "device" else name_map[tool]))

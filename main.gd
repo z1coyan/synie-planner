@@ -6,6 +6,10 @@ var builder: Builder
 var wall_tool: WallTool
 var hud: Hud
 var menu: PauseMenu
+var floors: FloorManager
+var library: ElementLibrary
+var opening_tool: OpeningTool
+var library_panel: LibraryPanel
 var ground_body: StaticBody3D
 
 func _ready() -> void:
@@ -20,6 +24,14 @@ func _ready() -> void:
 	add_child(content)
 	world.setup(content, ground_body)
 
+	floors = FloorManager.new()
+	floors.name = "FloorManager"
+	add_child(floors)
+	floors.setup(world)
+
+	library = ElementLibrary.new()
+	library.setup()
+
 	camera_rig = CameraController.new()
 	camera_rig.name = "CameraRig"
 	add_child(camera_rig)
@@ -33,19 +45,43 @@ func _ready() -> void:
 	builder = Builder.new()
 	builder.name = "Builder"
 	add_child(builder)
-	builder.setup(world, camera_rig, hud)
+	builder.setup(world, camera_rig, hud, floors, library)
 
 	wall_tool = WallTool.new()
 	wall_tool.name = "WallTool"
 	add_child(wall_tool)
-	wall_tool.setup(world, camera_rig, hud)
+	wall_tool.setup(world, camera_rig, hud, floors)
+
+	opening_tool = OpeningTool.new()
+	opening_tool.name = "OpeningTool"
+	add_child(opening_tool)
+	opening_tool.setup(world, camera_rig, hud, floors)
+
+	library_panel = LibraryPanel.new()
+	library_panel.name = "LibraryPanel"
+	add_child(library_panel)
+	library_panel.setup(library, builder, camera_rig, hud)
 
 	menu = PauseMenu.new()
 	menu.name = "PauseMenu"
 	add_child(menu)
 	menu.setup(camera_rig)
 
+	floors.floor_changed.connect(_on_floor_changed)
+	floors.show_all_changed.connect(_on_show_all_changed)
+
 	_set_tool("column")
+	_update_floor_hud()
+
+func _on_floor_changed(index: int) -> void:
+	wall_tool.cancel()
+	_update_floor_hud()
+
+func _on_show_all_changed(value: bool) -> void:
+	_update_floor_hud()
+
+func _update_floor_hud() -> void:
+	hud.set_floor_text("楼层: %dF   显示: %s" % [floors.current_floor + 1, "全部" if floors.show_all else "单层"])
 
 func _build_environment() -> void:
 	var env := Environment.new()
@@ -155,6 +191,8 @@ func _line_mat(color: Color) -> StandardMaterial3D:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if library_panel.is_open():
+			return
 		match event.keycode:
 			KEY_1:
 				_set_tool("wall")
@@ -165,9 +203,35 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_3:
 				_set_tool("device")
 				get_viewport().set_input_as_handled()
+			KEY_4:
+				_set_tool("opening")
+				get_viewport().set_input_as_handled()
+			KEY_5:
+				floors.set_floor(0)
+				get_viewport().set_input_as_handled()
+			KEY_6:
+				floors.set_floor(1)
+				get_viewport().set_input_as_handled()
+			KEY_7:
+				floors.set_floor(2)
+				get_viewport().set_input_as_handled()
+			KEY_8:
+				floors.set_floor(3)
+				get_viewport().set_input_as_handled()
+			KEY_9:
+				floors.toggle_show_all()
+				get_viewport().set_input_as_handled()
+			KEY_B:
+				library_panel.toggle()
+				get_viewport().set_input_as_handled()
+			KEY_T:
+				world.toggle_labels()
+				hud.set_status("设备标签：%s" % ("开" if world.labels_visible else "关"))
+				get_viewport().set_input_as_handled()
 
 func _set_tool(t: String) -> void:
 	wall_tool.set_active(t == "wall")
-	builder.set_tool(t if t in ["column", "device"] else "none")
+	opening_tool.set_active(t == "opening")
+	builder.set_tool("column" if t == "column" else "device" if t == "device" else "none")
 	if t == "none":
-		hud.set_status("无工具（Tab 视角切换，1/2/3 选择工具）")
+		hud.set_status("无工具（Tab 视角切换，1 墙 2 柱 3 设备 4 开洞，5-8 楼层）")
