@@ -36,6 +36,7 @@ func setup(lib: ElementLibrary, b: Builder, cc: CameraController, h: Hud) -> voi
 	_panel.offset_top = -280.0
 	_panel.offset_right = 240.0
 	_panel.offset_bottom = 280.0
+	_panel.theme = UiTheme.make_theme()
 
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 6)
@@ -82,7 +83,7 @@ func setup(lib: ElementLibrary, b: Builder, cc: CameraController, h: Hud) -> voi
 	form.add_child(_h_box)
 	form.add_child(_mk_label("颜色"))
 	_color_btn = ColorPickerButton.new()
-	_color_btn.color = Color(0.4, 0.7, 1.0)
+	_color_btn.color = Color(0.78, 0.79, 0.81)
 	form.add_child(_color_btn)
 	vb.add_child(form)
 

@@ -9,16 +9,16 @@ var current := 0
 
 func setup() -> void:
 	devices = [
-		{"name": "注塑机", "size": Vector3(6.0, 3.0, 2.5), "color": Color(0.35, 0.6, 0.95), "category": "成型设备"},
-		{"name": "空压机", "size": Vector3(3.0, 2.0, 2.0), "color": Color(0.6, 0.6, 0.65), "category": "动力设备"},
-		{"name": "输送带", "size": Vector3(4.0, 1.2, 1.0), "color": Color(0.9, 0.55, 0.25), "category": "输送设备"},
-		{"name": "机器人工位", "size": Vector3(2.0, 2.2, 2.0), "color": Color(0.3, 0.8, 0.4), "category": "自动化"},
+		{"name": "注塑机", "size": Vector3(6.0, 3.0, 2.5), "color": Color(0.88, 0.89, 0.90), "category": "成型设备"},
+		{"name": "空压机", "size": Vector3(3.0, 2.0, 2.0), "color": Color(0.80, 0.81, 0.83), "category": "动力设备"},
+		{"name": "输送带", "size": Vector3(4.0, 1.2, 1.0), "color": Color(0.75, 0.76, 0.78), "category": "输送设备"},
+		{"name": "机器人工位", "size": Vector3(2.0, 2.2, 2.0), "color": Color(0.84, 0.85, 0.86), "category": "自动化"},
 	]
 	current = 0
 
 func current_device() -> Dictionary:
 	if devices.is_empty():
-		return {"name": "设备", "size": Vector3(2.0, 2.0, 2.0), "color": Color(0.6, 0.6, 0.6), "category": ""}
+		return {"name": "设备", "size": Vector3(2.0, 2.0, 2.0), "color": Color(0.78, 0.79, 0.81), "category": ""}
 	return devices[current]
 
 func count() -> int:

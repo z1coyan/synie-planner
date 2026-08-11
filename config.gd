@@ -29,15 +29,20 @@ const TOP_DOWN_MIN := 6.0
 const TOP_DOWN_MAX := 200.0
 const MOUSE_SENS := 0.002
 
-const COLOR_GROUND := Color(0.16, 0.17, 0.18, 1.0)
-const COLOR_GRID_MINOR := Color(0.28, 0.30, 0.32, 1.0)
-const COLOR_GRID_MAJOR := Color(0.42, 0.45, 0.48, 1.0)
-const COLOR_AXIS := Color(0.85, 0.30, 0.30, 1.0)
-const COLOR_WALL := Color(0.78, 0.76, 0.68, 1.0)
-const COLOR_COLUMN := Color(0.45, 0.45, 0.52, 1.0)
-const COLOR_DEVICE := Color(0.35, 0.65, 0.95, 1.0)
-const COLOR_OK := Color(0.15, 0.95, 0.30, 0.35)
-const COLOR_BAD := Color(0.95, 0.20, 0.20, 0.35)
+## 白模配色纪律：建筑/设备一律灰白（明度 0.75~0.95），
+## 仅允许橙色（选中/悬停高亮）与青色（物流路径）两个强调色。
+
+const COLOR_GROUND := Color(0.85, 0.86, 0.88, 1.0)
+const COLOR_GRID_MINOR := Color(0.72, 0.73, 0.75, 1.0)
+const COLOR_GRID_MAJOR := Color(0.60, 0.61, 0.63, 1.0)
+const COLOR_AXIS := Color(0.52, 0.53, 0.55, 1.0)
+const COLOR_WALL := Color(0.89, 0.90, 0.91, 1.0)
+const COLOR_COLUMN := Color(0.80, 0.81, 0.83, 1.0)
+const COLOR_DEVICE := Color(0.78, 0.79, 0.81, 1.0)
+const COLOR_ACCENT := Color(0.96, 0.60, 0.15, 1.0)      # 橙色：选中/悬停高亮
+const COLOR_PATH := Color(0.20, 0.78, 0.85, 1.0)       # 青色：物流路径
+const COLOR_OK := Color(0.96, 0.60, 0.15, 0.35)
+const COLOR_BAD := Color(0.35, 0.36, 0.38, 0.45)
 
 const FLOOR_COUNT := 4
 const FLOOR_HEIGHT := 5.0
@@ -46,9 +51,9 @@ const FLOOR_TOP_OFFSET := 0.3
 const FLOOR_SIZE := Vector2(90.0, 50.0)
 const SLAB_CELL := 0.5
 
-const COLOR_FLOOR := Color(0.52, 0.52, 0.56, 1.0)
-const COLOR_FLOOR_GRID := Color(0.34, 0.35, 0.38, 1.0)
-const COLOR_OPENING := Color(0.95, 0.7, 0.2, 1.0)
+const COLOR_FLOOR := Color(0.86, 0.87, 0.89, 1.0)
+const COLOR_FLOOR_GRID := Color(0.66, 0.67, 0.69, 0.55)
+const COLOR_OPENING := Color(0.96, 0.60, 0.15, 1.0)
 
 const OPENING_TYPES := [
 	{"name": "吊装孔", "size": Vector2(3.0, 3.0)},

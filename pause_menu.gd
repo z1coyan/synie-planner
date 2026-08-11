@@ -20,6 +20,7 @@ func setup(cc: CameraController) -> void:
 	panel.offset_top = -130.0
 	panel.offset_right = 170.0
 	panel.offset_bottom = 130.0
+	panel.theme = UiTheme.make_theme()
 
 	var vb := VBoxContainer.new()
 	vb.add_theme_constant_override("separation", 10)
@@ -32,7 +33,7 @@ func setup(cc: CameraController) -> void:
 	vb.add_child(title)
 
 	var hint := Label.new()
-	hint.text = "Tab 视角 · 1/2/3/4 工具 · 5-8 楼层 · 9 全层 · B 元素库"
+	hint.text = "Tab 视角 · 0-9 快捷栏 · B 元素库"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vb.add_child(hint)
 

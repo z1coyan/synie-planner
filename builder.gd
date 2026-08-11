@@ -109,7 +109,7 @@ func _show_preview(center: Vector3, size: Vector3, ok: bool) -> void:
 		_wire_mi.mesh = _build_wire(size)
 	_fill_mi.material_override = _fill_mat_ok if ok else _fill_mat_bad
 	var wire_mat := _wire_mi.mesh.surface_get_material(0) as StandardMaterial3D
-	wire_mat.albedo_color = Color(1.0, 0.2, 0.2, 1.0) if not ok else Color(0.2, 1.0, 0.35, 1.0)
+	wire_mat.albedo_color = Color(0.96, 0.60, 0.15, 1.0) if ok else Color(0.55, 0.56, 0.58, 1.0)
 	_preview_root.position = center
 	_preview_root.visible = true
 
@@ -124,7 +124,7 @@ func _build_wire(box_size: Vector3) -> ImmediateMesh:
 		Vector2i(0, 4), Vector2i(1, 5), Vector2i(2, 6), Vector2i(3, 7)]
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.albedo_color = Color(0.2, 1.0, 0.35, 1.0)
+	m.albedo_color = Color(0.96, 0.60, 0.15, 1.0)
 	var im := ImmediateMesh.new()
 	im.surface_begin(Mesh.PRIMITIVE_LINES, m)
 	for e in edges:

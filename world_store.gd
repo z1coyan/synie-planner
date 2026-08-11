@@ -22,10 +22,7 @@ func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: floa
 	var mi := MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = size
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.metallic = 0.05
-	mat.roughness = 0.9
+	var mat := _clay_mat(color)
 	bm.material = mat
 	mi.mesh = bm
 	body.add_child(mi)
@@ -56,15 +53,39 @@ func _add_label(body: StaticBody3D, size: Vector3, text: String) -> void:
 	var label := Label3D.new()
 	label.name = "Label"
 	label.text = text
-	label.font_size = 48
-	label.pixel_size = 0.0035
+	label.font_size = 40
+	label.pixel_size = 0.0032
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.position = Vector3(0.0, size.y * 0.5 + 0.35, 0.0)
-	label.modulate = Color(0.95, 0.98, 1.0, 0.95)
-	label.outline_size = 12
-	label.outline_modulate = Color(0.05, 0.05, 0.1, 0.9)
+	label.position = Vector3(0.0, size.y * 0.5 + 0.4, 0.0)
+	label.modulate = Color(0.24, 0.25, 0.27, 0.95)
+	label.outline_size = 8
+	label.outline_modulate = Color(0.94, 0.95, 0.96, 0.95)
 	label.visible = labels_visible
 	body.add_child(label)
+	_add_leader(body, size)
+
+func _add_leader(body: StaticBody3D, size: Vector3) -> void:
+	var leader := MeshInstance3D.new()
+	leader.name = "Leader"
+	leader.position = Vector3(0.0, size.y * 0.5 + 0.2, 0.0)
+	var line := CylinderMesh.new()
+	line.top_radius = 0.015
+	line.bottom_radius = 0.015
+	line.height = 0.4
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.albedo_color = Color(0.45, 0.46, 0.48, 1.0)
+	line.material = m
+	leader.mesh = line
+	leader.visible = labels_visible
+	body.add_child(leader)
+
+func _clay_mat(color: Color) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.albedo_color = color
+	m.roughness = 0.9
+	m.metallic = 0.0
+	return m
 
 func toggle_labels() -> void:
 	labels_visible = not labels_visible
@@ -73,6 +94,9 @@ func toggle_labels() -> void:
 			var l: Node = obj.get_node_or_null("Label")
 			if l != null:
 				l.visible = labels_visible
+			var lead: Node = obj.get_node_or_null("Leader")
+			if lead != null:
+				lead.visible = labels_visible
 
 func top_surface_y(body: Node3D) -> float:
 	if body == ground_body:

@@ -138,6 +138,10 @@ func _build_slab_mesh(f: int) -> ArrayMesh:
 			st.add_vertex(Vector3(x0, 0.0, z0))
 			st.add_vertex(Vector3(x1, 0.0, z1))
 			st.add_vertex(Vector3(x1, 0.0, z0))
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Config.COLOR_FLOOR
+	mat.roughness = 1.0
+	st.set_material(mat)
 	st.generate_normals()
 	return st.commit()
 
@@ -160,42 +164,41 @@ func _point_in_rect(p: Vector2, rect: Dictionary) -> bool:
 func _build_floor_grid(f: int) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
 	mi.name = "Grid%dF" % (f + 1)
-	if f >= 1:
-		var minor := _line_mat(Config.COLOR_FLOOR_GRID)
-		var major := _line_mat(Config.COLOR_GRID_MAJOR)
-		var hw := Config.FLOOR_SIZE.x * 0.5
-		var hd := Config.FLOOR_SIZE.y * 0.5
-		var im := ImmediateMesh.new()
-		im.surface_begin(Mesh.PRIMITIVE_LINES, minor)
-		var x := -hw
-		while x <= hw + 0.001:
-			if absf(fmod(x, Config.GRID_MAJOR)) > 0.001:
-				im.surface_add_vertex(Vector3(x, 0.0, -hd))
-				im.surface_add_vertex(Vector3(x, 0.0, hd))
-			x += Config.GRID
-		var z := -hd
-		while z <= hd + 0.001:
-			if absf(fmod(z, Config.GRID_MAJOR)) > 0.001:
-				im.surface_add_vertex(Vector3(-hw, 0.0, z))
-				im.surface_add_vertex(Vector3(hw, 0.0, z))
-			z += Config.GRID
-		im.surface_end()
-		im.surface_begin(Mesh.PRIMITIVE_LINES, major)
-		x = -hw
-		while x <= hw + 0.001:
-			if absf(fmod(x, Config.GRID_MAJOR)) <= 0.001:
-				im.surface_add_vertex(Vector3(x, 0.0, -hd))
-				im.surface_add_vertex(Vector3(x, 0.0, hd))
-			x += Config.GRID
-		z = -hd
-		while z <= hd + 0.001:
-			if absf(fmod(z, Config.GRID_MAJOR)) <= 0.001:
-				im.surface_add_vertex(Vector3(-hw, 0.0, z))
-				im.surface_add_vertex(Vector3(hw, 0.0, z))
-			z += Config.GRID
-		im.surface_end()
-		mi.mesh = im
-		mi.position.y = floor_top(f) + 0.002
+	var minor := _line_mat(Config.COLOR_FLOOR_GRID)
+	var major := _line_mat(Config.COLOR_GRID_MAJOR)
+	var hw := Config.FLOOR_SIZE.x * 0.5
+	var hd := Config.FLOOR_SIZE.y * 0.5
+	var im := ImmediateMesh.new()
+	im.surface_begin(Mesh.PRIMITIVE_LINES, minor)
+	var x := -hw
+	while x <= hw + 0.001:
+		if absf(fmod(x, Config.GRID_MAJOR)) > 0.001:
+			im.surface_add_vertex(Vector3(x, 0.0, -hd))
+			im.surface_add_vertex(Vector3(x, 0.0, hd))
+		x += Config.GRID
+	var z := -hd
+	while z <= hd + 0.001:
+		if absf(fmod(z, Config.GRID_MAJOR)) > 0.001:
+			im.surface_add_vertex(Vector3(-hw, 0.0, z))
+			im.surface_add_vertex(Vector3(hw, 0.0, z))
+		z += Config.GRID
+	im.surface_end()
+	im.surface_begin(Mesh.PRIMITIVE_LINES, major)
+	x = -hw
+	while x <= hw + 0.001:
+		if absf(fmod(x, Config.GRID_MAJOR)) <= 0.001:
+			im.surface_add_vertex(Vector3(x, 0.0, -hd))
+			im.surface_add_vertex(Vector3(x, 0.0, hd))
+		x += Config.GRID
+	z = -hd
+	while z <= hd + 0.001:
+		if absf(fmod(z, Config.GRID_MAJOR)) <= 0.001:
+			im.surface_add_vertex(Vector3(-hw, 0.0, z))
+			im.surface_add_vertex(Vector3(hw, 0.0, z))
+		z += Config.GRID
+	im.surface_end()
+	mi.mesh = im
+	mi.position.y = floor_top(f) + 0.002
 	add_child(mi)
 	return mi
 
@@ -206,7 +209,7 @@ func _apply_visibility() -> void:
 		slab.visible = vis
 		slab.collision_layer = 2 if vis else 0
 		var grid: MeshInstance3D = grids[f]
-		grid.visible = vis and f >= 1
+		grid.visible = vis
 	if world != null:
 		for obj in world.placed:
 			var f := int(obj.get_meta("floor", 0))
@@ -218,4 +221,6 @@ func _line_mat(color: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.albedo_color = color
+	if color.a < 1.0:
+		m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	return m

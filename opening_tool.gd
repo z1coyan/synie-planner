@@ -57,7 +57,7 @@ func _holo_mat(base: Color) -> StandardMaterial3D:
 func _build_wire_unit() -> ImmediateMesh:
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.albedo_color = Color(0.2, 1.0, 0.35, 1.0)
+	m.albedo_color = Config.COLOR_ACCENT
 	var im := ImmediateMesh.new()
 	im.surface_begin(Mesh.PRIMITIVE_LINES, m)
 	var h := 0.5
@@ -109,7 +109,7 @@ func _snap_grid(p: Vector3) -> Vector3:
 func _show_preview(pos: Vector3, s: Vector2, yaw: float, ok: bool) -> void:
 	_fill.material_override = _fill_ok if ok else _fill_bad
 	var wire_mat := _wire.mesh.surface_get_material(0) as StandardMaterial3D
-	wire_mat.albedo_color = Color(1.0, 0.2, 0.2, 1.0) if not ok else Color(0.2, 1.0, 0.35, 1.0)
+	wire_mat.albedo_color = Color(0.96, 0.60, 0.15, 1.0) if ok else Color(0.55, 0.56, 0.58, 1.0)
 	_preview_root.position = pos
 	_preview_root.rotation.y = yaw
 	_preview_root.scale = Vector3(s.x, 1.0, s.y)

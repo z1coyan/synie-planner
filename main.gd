@@ -10,11 +10,12 @@ var floors: FloorManager
 var library: ElementLibrary
 var opening_tool: OpeningTool
 var library_panel: LibraryPanel
-var ground_body: StaticBody3D
+var hotbar: Hotbar
+
+var current_tool := "column"
 
 func _ready() -> void:
 	_build_environment()
-	ground_body = _build_ground()
 
 	world = WorldStore.new()
 	world.name = "WorldStore"
@@ -22,7 +23,7 @@ func _ready() -> void:
 	var content := Node3D.new()
 	content.name = "Content"
 	add_child(content)
-	world.setup(content, ground_body)
+	world.setup(content, null)
 
 	floors = FloorManager.new()
 	floors.name = "FloorManager"
@@ -41,6 +42,11 @@ func _ready() -> void:
 	hud.name = "Hud"
 	add_child(hud)
 	hud.setup()
+
+	hotbar = Hotbar.new()
+	hotbar.name = "Hotbar"
+	add_child(hotbar)
+	hotbar.setup()
 
 	builder = Builder.new()
 	builder.name = "Builder"
@@ -82,118 +88,65 @@ func _on_show_all_changed(value: bool) -> void:
 
 func _update_floor_hud() -> void:
 	hud.set_floor_text("楼层: %dF   显示: %s" % [floors.current_floor + 1, "全部" if floors.show_all else "单层"])
+	hotbar.set_state(current_tool, floors.current_floor, floors.show_all)
 
 func _build_environment() -> void:
 	var env := Environment.new()
 	var sky := Sky.new()
 	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.35, 0.5, 0.7)
-	sky_mat.sky_horizon_color = Color(0.6, 0.68, 0.75)
-	sky_mat.ground_horizon_color = Color(0.45, 0.45, 0.45)
-	sky_mat.ground_bottom_color = Color(0.2, 0.2, 0.2)
+	sky_mat.sky_top_color = Color(0.72, 0.74, 0.77)
+	sky_mat.sky_horizon_color = Color(0.92, 0.93, 0.94)
+	sky_mat.ground_horizon_color = Color(0.88, 0.89, 0.90)
+	sky_mat.ground_bottom_color = Color(0.70, 0.71, 0.73)
 	sky.sky_material = sky_mat
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.glow_enabled = true
+	env.glow_intensity = 0.1
+	env.glow_bloom = 0.0
+	env.glow_strength = 0.8
+	env.ssao_enabled = true
+	env.ssao_intensity = 2.2
+	env.ssao_radius = 0.5
+	env.ssao_sharpness = 0.9
+	env.ssao_light_affect = 0.3
+	env.fog_enabled = true
+	env.fog_mode = Environment.FOG_MODE_DEPTH
+	env.fog_light_color = Color(0.85, 0.86, 0.87)
+	env.fog_depth_begin = 40.0
+	env.fog_depth_end = 260.0
+	env.fog_depth_curve = 1.0
+	env.fog_sky_affect = 0.05
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 
+	var vignette := Vignette.new()
+	vignette.name = "Vignette"
+	add_child(vignette)
+	vignette.setup()
+
 	var sun := DirectionalLight3D.new()
 	sun.name = "Sun"
 	sun.rotation_degrees = Vector3(-55.0, -35.0, 0.0)
+	sun.light_color = Color(1.0, 0.98, 0.93)
+	sun.light_energy = 1.05
+	sun.light_angular_distance = 4.0
 	sun.shadow_enabled = true
-	sun.light_energy = 1.2
+	sun.shadow_blur = 2.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
 	add_child(sun)
-
-func _build_ground() -> StaticBody3D:
-	var body := StaticBody3D.new()
-	body.name = "Ground"
-	body.collision_layer = 2
-	body.collision_mask = 0
-
-	var mi := MeshInstance3D.new()
-	var pm := PlaneMesh.new()
-	pm.size = Vector2(Config.GRID_EXTENT * 2.0, Config.GRID_EXTENT * 2.0)
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = Config.COLOR_GROUND
-	mat.roughness = 1.0
-	pm.material = mat
-	mi.mesh = pm
-	mi.rotation_degrees.x = -90.0
-	body.add_child(mi)
-
-	var cs := CollisionShape3D.new()
-	var bs := BoxShape3D.new()
-	bs.size = Vector3(Config.GRID_EXTENT * 2.0, 0.5, Config.GRID_EXTENT * 2.0)
-	cs.shape = bs
-	cs.position.y = -0.25
-	body.add_child(cs)
-
-	add_child(body)
-	_build_grid()
-	return body
-
-func _build_grid() -> void:
-	var minor := _line_mat(Config.COLOR_GRID_MINOR)
-	var major := _line_mat(Config.COLOR_GRID_MAJOR)
-	var ext := Config.GRID_EXTENT
-	var step := Config.GRID
-	var mstep := Config.GRID_MAJOR
-	var im := ImmediateMesh.new()
-
-	im.surface_begin(Mesh.PRIMITIVE_LINES, minor)
-	_build_minor_lines(im, ext, step, mstep)
-	im.surface_end()
-	im.surface_begin(Mesh.PRIMITIVE_LINES, major)
-	_build_major_lines(im, ext, step, mstep)
-	im.surface_end()
-
-	var mi := MeshInstance3D.new()
-	mi.name = "Grid"
-	mi.mesh = im
-	mi.position.y = 0.002
-	add_child(mi)
-
-func _build_minor_lines(im: ImmediateMesh, ext: float, step: float, mstep: float) -> void:
-	var x := -ext
-	while x <= ext + 0.001:
-		if absf(fmod(x, mstep)) > 0.001:
-			im.surface_add_vertex(Vector3(x, 0.0, -ext))
-			im.surface_add_vertex(Vector3(x, 0.0, ext))
-		x += step
-	var z := -ext
-	while z <= ext + 0.001:
-		if absf(fmod(z, mstep)) > 0.001:
-			im.surface_add_vertex(Vector3(-ext, 0.0, z))
-			im.surface_add_vertex(Vector3(ext, 0.0, z))
-		z += step
-
-func _build_major_lines(im: ImmediateMesh, ext: float, step: float, mstep: float) -> void:
-	var x := -ext
-	while x <= ext + 0.001:
-		if absf(fmod(x, mstep)) <= 0.001:
-			im.surface_add_vertex(Vector3(x, 0.0, -ext))
-			im.surface_add_vertex(Vector3(x, 0.0, ext))
-		x += step
-	var z := -ext
-	while z <= ext + 0.001:
-		if absf(fmod(z, mstep)) <= 0.001:
-			im.surface_add_vertex(Vector3(-ext, 0.0, z))
-			im.surface_add_vertex(Vector3(ext, 0.0, z))
-		z += step
-
-func _line_mat(color: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.albedo_color = color
-	return m
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if library_panel.is_open():
 			return
 		match event.keycode:
+			KEY_0:
+				_set_tool("none")
+				get_viewport().set_input_as_handled()
 			KEY_1:
 				_set_tool("wall")
 				get_viewport().set_input_as_handled()
@@ -230,8 +183,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 
 func _set_tool(t: String) -> void:
+	current_tool = t
 	wall_tool.set_active(t == "wall")
 	opening_tool.set_active(t == "opening")
 	builder.set_tool("column" if t == "column" else "device" if t == "device" else "none")
+	hotbar.set_state(t, floors.current_floor, floors.show_all)
 	if t == "none":
-		hud.set_status("无工具（Tab 视角切换，1 墙 2 柱 3 设备 4 开洞，5-8 楼层）")
+		hud.set_status("无工具（0-9 快捷栏选择工具与楼层）")

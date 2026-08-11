@@ -44,8 +44,8 @@ func setup(w: WorldStore, cc: CameraController, h: Hud, fm: FloorManager) -> voi
 	add_child(_preview_root)
 	_fill_mi = MeshInstance3D.new()
 	_preview_root.add_child(_fill_mi)
-	_start_marker = _make_marker(Color(1.0, 0.8, 0.2, 1.0))
-	_end_marker = _make_marker(Color(0.2, 0.9, 1.0, 1.0))
+	_start_marker = _make_marker(Config.COLOR_ACCENT)
+	_end_marker = _make_marker(Config.COLOR_PATH)
 
 func _make_marker(color: Color) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
