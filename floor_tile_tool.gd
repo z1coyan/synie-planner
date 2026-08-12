@@ -17,6 +17,7 @@ var valid := false
 var _drawing := false
 var _start := Vector3.ZERO      # 起点（XZ，Y=0）
 var _end := Vector3.ZERO        # 终点（XZ，Y=0）
+var _place_rect: Dictionary = {}  # 预览通过的待铺矩形（含边缘外推回退结果）
 
 var _preview_root: Node3D
 var _fill_mi: MeshInstance3D
@@ -133,35 +134,124 @@ func _snap_point(p: Vector3) -> Vector3:
 	var g := Config.GRID
 	return Vector3(roundf(p.x / g) * g, 0.0, roundf(p.z / g) * g)
 
+## 地板矩形：水平方向四周外扩 EMBED、底部下沉 EMBED（顶面标高不变）。
+## 侧边埋入相邻地板/墙体、底面埋入地面，相交面互相穿过而非共面，消除闪烁。
+## 边缘若停在墙/柱 footprint 附近，先收进构件体内（_extend_edges），
+## 使墙/柱侧面遮住地板边——既无根部凹槽，也无外凸沿口。
 func _rect() -> Dictionary:
 	var min_x: float = minf(_start.x, _end.x)
 	var max_x: float = maxf(_start.x, _end.x)
 	var min_z: float = minf(_start.z, _end.z)
 	var max_z: float = maxf(_start.z, _end.z)
+	var ex := _extend_edges(min_x, max_x, min_z, max_z)
+	min_x = ex[0]
+	max_x = ex[1]
+	min_z = ex[2]
+	max_z = ex[3]
+	var h := Config.FLOOR_THICKNESS + Config.EMBED
 	return {
-		"size": Vector3(max_x - min_x, Config.FLOOR_THICKNESS, max_z - min_z),
+		"size": Vector3(max_x - min_x + Config.EMBED * 2.0, h, max_z - min_z + Config.EMBED * 2.0),
 		"center": Vector3((min_x + max_x) * 0.5,
-			Config.FLOOR_TOP_OFFSET + Config.FLOOR_THICKNESS * 0.5,
+			Config.FLOOR_TOP_OFFSET + h * 0.5 - Config.EMBED,
 			(min_z + max_z) * 0.5),
 	}
+
+## 矩形边停在墙/柱 footprint（厚度带）内或贴近其侧面（≤2×EMBED，含角点吸附
+## 恰好在侧面的情况）时，把该边收进构件体内：最终地板边埋在最浅那个构件的
+## 侧面内侧 EMBED 处——侧面遮住地板边，无凹槽、无凸沿、不共面。
+## 多个构件（如柱贴墙）对同一边给出不同收边目标时，取移动量最小的，
+## 避免被深层构件推过浅层构件的侧面形成凸沿。仅处理近轴对齐的墙；斜墙跳过。
+func _extend_edges(min_x: float, max_x: float, min_z: float, max_z: float) -> Array:
+	var m := Config.EMBED * 2.0
+	# 收边目标：min 边取各带 smin+m 的最大值，max 边取各带 smax-m 的最小值
+	var pull_min_x := -INF
+	var pull_max_x := INF
+	var pull_min_z := -INF
+	var pull_max_z := INF
+	for obj in world.placed:
+		if not obj.has_meta("kind"):
+			continue
+		var kind: String = obj.get_meta("kind")
+		if kind != "wall" and kind != "column":
+			continue
+		var c: Vector3 = obj.global_position
+		var size: Vector3 = obj.get_meta("size")
+		var yaw: float = obj.get_meta("yaw")
+		if kind == "column":
+			var hx: float = size.x * 0.5
+			var hz: float = size.z * 0.5
+			# x 厚度带：z 向需与柱 footprint 重叠
+			if max_z >= c.z - hz and min_z <= c.z + hz:
+				if min_x >= c.x - hx - m and min_x <= c.x + hx + m:
+					pull_min_x = maxf(pull_min_x, c.x - hx + m)
+				if max_x >= c.x - hx - m and max_x <= c.x + hx + m:
+					pull_max_x = minf(pull_max_x, c.x + hx - m)
+			# z 厚度带：x 向需与柱 footprint 重叠
+			if max_x >= c.x - hx and min_x <= c.x + hx:
+				if min_z >= c.z - hz - m and min_z <= c.z + hz + m:
+					pull_min_z = maxf(pull_min_z, c.z - hz + m)
+				if max_z >= c.z - hz - m and max_z <= c.z + hz + m:
+					pull_max_z = minf(pull_max_z, c.z + hz - m)
+		else:
+			var half_t: float = size.z * 0.5
+			var half_l: float = size.x * 0.5
+			if absf(cos(yaw)) >= absf(sin(yaw)):
+				# 墙沿 x 走向：厚度在 z，收 z 边；x 向需与墙段跨度重叠
+				if max_x >= c.x - half_l and min_x <= c.x + half_l:
+					if min_z >= c.z - half_t - m and min_z <= c.z + half_t + m:
+						pull_min_z = maxf(pull_min_z, c.z - half_t + m)
+					if max_z >= c.z - half_t - m and max_z <= c.z + half_t + m:
+						pull_max_z = minf(pull_max_z, c.z + half_t - m)
+			else:
+				# 墙沿 z 走向：厚度在 x，收 x 边；z 向需与墙段跨度重叠
+				if max_z >= c.z - half_l and min_z <= c.z + half_l:
+					if min_x >= c.x - half_t - m and min_x <= c.x + half_t + m:
+						pull_min_x = maxf(pull_min_x, c.x - half_t + m)
+					if max_x >= c.x - half_t - m and max_x <= c.x + half_t + m:
+						pull_max_x = minf(pull_max_x, c.x + half_t - m)
+	if pull_min_x > -INF:
+		min_x = pull_min_x
+	if pull_max_x < INF:
+		max_x = pull_max_x
+	if pull_min_z > -INF:
+		min_z = pull_min_z
+	if pull_max_z < INF:
+		max_z = pull_max_z
+	# 异常保护：收边后矩形翻面则放弃该轴收边（保持原始范围）
+	if min_x >= max_x:
+		min_x = minf(_start.x, _end.x)
+		max_x = maxf(_start.x, _end.x)
+	if min_z >= max_z:
+		min_z = minf(_start.z, _end.z)
+		max_z = maxf(_start.z, _end.z)
+	return [min_x, max_x, min_z, max_z]
+
+## 矩形的名义尺寸（不含 EMBED 外扩），用于显示与退化判断。
+func _nominal_size(size: Vector3) -> Vector3:
+	return Vector3(size.x - Config.EMBED * 2.0, size.y, size.z - Config.EMBED * 2.0)
 
 func _update_rect_preview() -> void:
 	var r := _rect()
 	var size: Vector3 = r["size"]
-	if size.x < Config.GRID or size.z < Config.GRID:
+	var nom := _nominal_size(size)
+	if nom.x < Config.GRID or nom.z < Config.GRID:
 		# 退化矩形（长或宽不足一格）
 		_preview_root.visible = false
+		_place_rect = {}
 		valid = false
 		hud.set_length("矩形过小")
 		return
 	valid = _rect_free(r["center"], size)
+	_place_rect = r if valid else {}
 	_show_preview(r["center"], size, valid)
-	hud.set_length("地板 %.1f×%.1f m：%s" % [size.x, size.z, "可铺设" if valid else "与地板/设备重叠"])
+	hud.set_length("地板 %.1f×%.1f m：%s" % [nom.x, nom.z, "可铺设" if valid else "与地板/设备重叠"])
 
-## 候选矩形是否无干涉。水平方向内缩 2cm，避免与边缘贴合的相邻地板误判重叠；
-## 墙体 / 柱子不参与干涉（地板可从其下方铺过，消除接缝），仅与地板、设备互斥。
+## 候选矩形是否无干涉。水平方向内缩（EMBED 外扩 + 1cm），避免与边缘贴合的
+## 相邻地板（同样外扩 EMBED）误判重叠；墙体 / 柱子不参与干涉（地板从其下方铺过，
+## 消除接缝），仅与地板、设备互斥。
 func _rect_free(center: Vector3, size: Vector3) -> bool:
-	var test := Vector3(size.x - 0.02, size.y, size.z - 0.02)
+	var shrink := Config.EMBED * 2.0 + 0.01
+	var test := Vector3(size.x - shrink, size.y, size.z - shrink)
 	return world.aabb_clear(AABB(center - test * 0.5, test), 0.0, [], ["wall", "column"])
 
 func _show_preview(center: Vector3, size: Vector3, ok: bool) -> void:
@@ -229,21 +319,22 @@ func _unhandled_input(event: InputEvent) -> void:
 func _cancel_drawing() -> void:
 	_drawing = false
 	valid = false
+	_place_rect = {}
 	_preview_root.visible = false
 	_start_marker.visible = false
 	hud.set_length("")
 
-## 点2 确认：铺设起点到终点的矩形地板（单块）。
+## 点2 确认：铺设预览通过的矩形（单块，含边缘外推结果）。
 func _place() -> void:
-	if not valid or not _preview_root.visible:
+	if not valid or not _preview_root.visible or _place_rect.is_empty():
 		_cancel_drawing()
 		hud.set_status("区域无效（过小或与地板/设备重叠），未铺设")
 		return
-	var r := _rect()
+	var r: Dictionary = _place_rect
 	world.place_box(r["center"], r["size"], Config.COLOR_FLOOR, "floor_tile")
-	var size: Vector3 = r["size"]
+	var nom := _nominal_size(r["size"])
 	_cancel_drawing()
-	hud.set_status("已铺设地板 %.1f×%.1f m" % [size.x, size.z])
+	hud.set_status("已铺设地板 %.1f×%.1f m" % [nom.x, nom.z])
 
 func _update_hud() -> void:
 	hud.set_tool_info("地板：两点矩形铺设，端点磁吸墙/柱/地板角点")

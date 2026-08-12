@@ -112,12 +112,21 @@ func _physics_process(_delta: float) -> void:
 
 ## 端点吸附顺序（均基于原始点，避免网格吸附掩盖目标）：
 ## 柱角内缩磁吸（角点向柱心各轴内缩半墙厚，墙端完全嵌入柱内且与柱面齐平）
-## → 墙/地板角点磁吸 → 0.5m 网格。
+## → 柱心磁吸（端点落在柱侧面附近时吸到柱心，墙端嵌入柱内，不留缝）
+## → 墙/地板角点磁吸
+## → 墙中心线磁吸（T 型接头端点吸到目标墙中心线，墙端嵌入墙内，不留缝）
+## → 0.5m 网格。
 func _snap_grid(p: Vector3) -> Vector3:
 	var s := world.snap_to_column_inset(p, thickness * 0.5, Config.SNAP_TO_CORNER)
 	if s != p:
 		return s
+	s = world.snap_to_kind(p, "column", Config.SNAP_TO_WALL)
+	if s != p:
+		return s
 	s = world.snap_to_corners(p, ["wall", "floor_tile"], Config.SNAP_TO_CORNER)
+	if s != p:
+		return s
+	s = world.snap_to_wall(p, Config.SNAP_TO_WALL)
 	if s != p:
 		return s
 	var g := Config.GRID
@@ -125,11 +134,12 @@ func _snap_grid(p: Vector3) -> Vector3:
 
 ## 画墙基准高度：起点落在柱子上时取柱底（即支撑面），
 ## 使墙能从柱子里拉出来，而不是悬在柱顶。
+## 柱体底部下沉了 EMBED 嵌入支撑面，真实基底 = 柱底 + EMBED。
 func _surface_base_y(aim: Dictionary) -> float:
 	var body: Object = aim.get("body")
 	if body != null and body.has_meta("kind") and body.get_meta("kind") == "column":
 		var size: Vector3 = body.get_meta("size")
-		return body.global_position.y - size.y * 0.5
+		return body.global_position.y - size.y * 0.5 + Config.EMBED
 	return aim["surface_y"]
 
 func _update_preview(end_point: Vector3) -> void:
@@ -142,10 +152,12 @@ func _update_preview(end_point: Vector3) -> void:
 		return
 	var length := between.length()
 	var yaw := -atan2(between.z, between.x)
-	var size := Vector3(length, Config.WALL_HEIGHT, thickness)
+	# 长度两端各外伸 EMBED、底部下沉 EMBED（顶面保持 base+WALL_HEIGHT 不变）：
+	# 墙端盖埋入柱体/相邻墙段、墙底埋入支撑面，所有相交面互相穿过而非共面。
+	var size := Vector3(length + Config.EMBED * 2.0, Config.WALL_HEIGHT + Config.EMBED, thickness)
 	var center := Vector3(
 		(start_point.x + end_point.x) * 0.5,
-		base_y + Config.WALL_HEIGHT * 0.5,
+		base_y + size.y * 0.5 - Config.EMBED,
 		(start_point.z + end_point.z) * 0.5,
 	)
 	var bs := BoxShape3D.new()

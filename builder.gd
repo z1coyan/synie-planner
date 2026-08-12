@@ -64,8 +64,9 @@ func set_tool(t: String) -> void:
 func _current_size() -> Vector3:
 	var s: Vector3
 	if tool == "column":
-		var w: float = Config.COLUMN_SIZES[col_size_index]
-		s = Vector3(w, Config.COLUMN_HEIGHT, w)
+		# 截面与高度均外扩 EMBED：柱顶高出墙面、柱侧穿出墙面，杜绝与墙共面
+		var w: float = Config.COLUMN_SIZES[col_size_index] + Config.EMBED * 2.0
+		s = Vector3(w, Config.COLUMN_HEIGHT + Config.EMBED * 2.0, w)
 	else:
 		s = library.current_device()["size"]
 	if rot_steps % 2 == 1:
@@ -95,6 +96,9 @@ func _physics_process(_delta: float) -> void:
 		# 柱子磁吸到附近墙的中心线，使柱嵌入墙内、消除接缝
 		snapped = world.snap_to_wall(snapped, Config.SNAP_TO_WALL)
 	var center := Vector3(snapped.x, aim["surface_y"] + size.y * 0.5, snapped.z)
+	if tool == "column":
+		# 柱底下沉 EMBED 埋入支撑面（顶面仍高出墙面 EMBED），底面不与支撑面共面
+		center.y -= Config.EMBED
 	var aabb := AABB(center - size * 0.5, size).grow(Config.CLEARANCE)
 	# 柱子允许与墙体、地板相交（嵌入），设备仍检测全部干涉
 	var ignore: Array = ["wall", "floor_tile"] if tool == "column" else []
