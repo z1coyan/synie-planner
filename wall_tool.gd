@@ -106,7 +106,7 @@ func _physics_process(_delta: float) -> void:
 		_end_marker.visible = false
 		return
 	var snapped := _snap_grid(aim["point"])
-	var mark_y: float = (base_y if drawing else aim["surface_y"]) + 0.11
+	var mark_y: float = (_surface_base_y(aim) if not drawing else base_y) + 0.11
 	_end_marker.position = Vector3(snapped.x, mark_y, snapped.z)
 	_end_marker.visible = true
 	if drawing:
@@ -114,7 +114,18 @@ func _physics_process(_delta: float) -> void:
 
 func _snap_grid(p: Vector3) -> Vector3:
 	var g := Config.GRID
-	return Vector3(roundf(p.x / g) * g, 0.0, roundf(p.z / g) * g)
+	var s := Vector3(roundf(p.x / g) * g, 0.0, roundf(p.z / g) * g)
+	# 端点磁吸到附近柱心，使墙端嵌入柱内、消除接缝
+	return world.snap_to_kind(s, "column", Config.SNAP_TO_COLUMN)
+
+## 画墙基准高度：起点落在柱子上时取柱底（即楼板面），
+## 使墙能从柱子里拉出来，而不是悬在柱顶。
+func _surface_base_y(aim: Dictionary) -> float:
+	var body: Object = aim.get("body")
+	if body != null and body.has_meta("kind") and body.get_meta("kind") == "column":
+		var size: Vector3 = body.get_meta("size")
+		return body.global_position.y - size.y * 0.5
+	return aim["surface_y"]
 
 func _update_preview(end_point: Vector3) -> void:
 	var between := end_point - start_point
@@ -134,7 +145,7 @@ func _update_preview(end_point: Vector3) -> void:
 	)
 	var bs := BoxShape3D.new()
 	bs.size = size
-	var ok := world.shape_clear(bs, Transform3D(Basis(Vector3.UP, yaw), center), 0.0, [], "wall")
+	var ok := world.shape_clear(bs, Transform3D(Basis(Vector3.UP, yaw), center), 0.0, [], ["wall", "column"])
 	_preview_center = center
 	_preview_size = size
 	_preview_yaw = yaw
@@ -184,7 +195,7 @@ func _on_left_click() -> void:
 	var snapped := _snap_grid(aim["point"])
 	if not drawing:
 		start_point = snapped
-		base_y = aim["surface_y"]
+		base_y = _surface_base_y(aim)
 		drawing = true
 		_last_size = Vector3.ZERO
 		_preview_ok = false

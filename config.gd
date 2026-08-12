@@ -7,6 +7,10 @@ const GRID := 0.5
 const GRID_MAJOR := 5.0
 const CLEARANCE := 0.05
 
+## 磁吸阈值（米）：墙端点吸附柱心 / 柱子吸附墙中心线，使墙柱互相嵌入、消除接缝
+const SNAP_TO_COLUMN := 0.25
+const SNAP_TO_WALL := 0.3
+
 ## 无限地面：巨型碰撞盒顶部对齐 1F 标高，等效无限建造区
 const GROUND_EXTENT := 20000.0
 

@@ -107,13 +107,14 @@ func top_surface_y(body: Node3D) -> float:
 	return body.global_position.y + size.y * 0.5
 
 ## 该 AABB 范围内是否无干涉（仅检测已放置物体，忽略地面）。
-func aabb_clear(aabb: AABB, grow: float, exclude: Array = [], exclude_kind: String = "") -> bool:
+func aabb_clear(aabb: AABB, grow: float, exclude: Array = [], exclude_kinds: Array = []) -> bool:
 	var bs := BoxShape3D.new()
 	bs.size = aabb.size
-	return shape_clear(bs, Transform3D(Basis(), aabb.get_center()), grow, exclude, exclude_kind)
+	return shape_clear(bs, Transform3D(Basis(), aabb.get_center()), grow, exclude, exclude_kinds)
 
-## 以指定形状/变换检测干涉。exclude_kind 非空时忽略该 kind 的物体（如墙互不阻挡）。
-func shape_clear(shape: Shape3D, xform: Transform3D, grow: float, exclude: Array = [], exclude_kind: String = "") -> bool:
+## 以指定形状/变换检测干涉。exclude_kinds 非空时忽略这些 kind 的物体
+## （如墙互不阻挡、墙与柱互相嵌入以消除接缝）。
+func shape_clear(shape: Shape3D, xform: Transform3D, grow: float, exclude: Array = [], exclude_kinds: Array = []) -> bool:
 	if shape is BoxShape3D and grow > 0.0:
 		var bs := BoxShape3D.new()
 		bs.size = (shape as BoxShape3D).size + Vector3.ONE * grow
@@ -128,13 +129,49 @@ func shape_clear(shape: Shape3D, xform: Transform3D, grow: float, exclude: Array
 		ex.append(ground_body)
 	params.exclude = ex
 	var hits := space.intersect_shape(params, 16)
-	if exclude_kind == "":
+	if exclude_kinds.is_empty():
 		return hits.is_empty()
 	for h in hits:
 		var col: CollisionObject3D = h["collider"]
-		if not col.has_meta("kind") or col.get_meta("kind") != exclude_kind:
+		if not col.has_meta("kind") or not exclude_kinds.has(col.get_meta("kind")):
 			return false
 	return true
+
+## 磁吸：若 p（XZ 平面）距某指定 kind 物体中心小于 max_dist，
+## 返回最近物体的中心；否则返回 p。
+func snap_to_kind(p: Vector3, kind: String, max_dist: float) -> Vector3:
+	var best := p
+	var best_d := max_dist
+	for obj in placed:
+		if not obj.has_meta("kind") or obj.get_meta("kind") != kind:
+			continue
+		var c: Vector3 = obj.global_position
+		var d := Vector2(p.x - c.x, p.z - c.z).length()
+		if d < best_d:
+			best_d = d
+			best = Vector3(c.x, p.y, c.z)
+	return best
+
+## 磁吸：若 p（XZ 平面）距某面墙的中心线段小于 max_dist，
+## 返回该线段上最近的点（钳制在墙段范围内）；否则返回 p。
+func snap_to_wall(p: Vector3, max_dist: float) -> Vector3:
+	var best := p
+	var best_d := max_dist
+	for obj in placed:
+		if not obj.has_meta("kind") or obj.get_meta("kind") != "wall":
+			continue
+		var size: Vector3 = obj.get_meta("size")
+		var yaw: float = obj.get_meta("yaw")
+		var dir := Vector3(cos(yaw), 0.0, -sin(yaw))
+		var c: Vector3 = obj.global_position
+		var rel := Vector3(p.x - c.x, 0.0, p.z - c.z)
+		var t := clampf(rel.dot(dir), -size.x * 0.5, size.x * 0.5)
+		var q := c + dir * t
+		var d := Vector2(p.x - q.x, p.z - q.z).length()
+		if d < best_d:
+			best_d = d
+			best = Vector3(q.x, p.y, q.z)
+	return best
 
 func surface_ray(origin: Vector3, dir: Vector3, max_dist: float) -> Dictionary:
 	var space := get_world_3d().direct_space_state
@@ -163,4 +200,5 @@ func aim_surface(cc) -> Dictionary:
 	return {
 		"point": hit["position"],
 		"surface_y": top_surface_y(collider),
+		"body": collider,
 	}
