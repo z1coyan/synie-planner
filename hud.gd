@@ -15,25 +15,25 @@ func setup() -> void:
 	panel.anchor_top = 0.0
 	panel.anchor_right = 0.0
 	panel.anchor_bottom = 0.0
-	panel.offset_left = 12.0
-	panel.offset_top = 12.0
+	panel.offset_left = 10.0
+	panel.offset_top = 10.0
 	panel.theme = UiTheme.make_theme()
 
 	var vb := VBoxContainer.new()
 	vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	vb.add_theme_constant_override("separation", 4)
+	vb.add_theme_constant_override("separation", 3)
 	panel.add_child(vb)
 
 	var accent := ColorRect.new()
 	accent.color = UiTheme.ACCENT
 	accent.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	accent.custom_minimum_size = Vector2(0.0, 3.0)
+	accent.custom_minimum_size = Vector2(0.0, 2.0)
 	vb.add_child(accent)
 
-	_status = _make_label(20, UiTheme.ACCENT)
-	_tool_info = _make_label(15, UiTheme.TEXT)
-	_length = _make_label(15, UiTheme.TEXT)
-	_floor = _make_label(15, Color(0.20, 0.78, 0.85))
+	_status = _make_label(15, UiTheme.ACCENT)
+	_tool_info = _make_label(12, UiTheme.TEXT)
+	_length = _make_label(12, UiTheme.TEXT)
+	_floor = _make_label(12, Color(0.20, 0.78, 0.85))
 	vb.add_child(_status)
 	vb.add_child(_tool_info)
 	vb.add_child(_length)

@@ -16,20 +16,20 @@ func setup(cc: CameraController) -> void:
 	panel.anchor_top = 0.5
 	panel.anchor_right = 0.5
 	panel.anchor_bottom = 0.5
-	panel.offset_left = -170.0
-	panel.offset_top = -130.0
-	panel.offset_right = 170.0
-	panel.offset_bottom = 130.0
+	panel.offset_left = -140.0
+	panel.offset_top = -108.0
+	panel.offset_right = 140.0
+	panel.offset_bottom = 108.0
 	panel.theme = UiTheme.make_theme()
 
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 10)
+	vb.add_theme_constant_override("separation", 8)
 	panel.add_child(vb)
 
 	var title := Label.new()
 	title.text = "菜单"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 28)
+	title.add_theme_font_size_override("font_size", 22)
 	vb.add_child(title)
 
 	var hint := Label.new()

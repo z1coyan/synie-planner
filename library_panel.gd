@@ -32,24 +32,24 @@ func setup(lib: ElementLibrary, b: Builder, cc: CameraController, h: Hud) -> voi
 	_panel.anchor_top = 0.5
 	_panel.anchor_right = 0.5
 	_panel.anchor_bottom = 0.5
-	_panel.offset_left = -240.0
-	_panel.offset_top = -280.0
-	_panel.offset_right = 240.0
-	_panel.offset_bottom = 280.0
+	_panel.offset_left = -200.0
+	_panel.offset_top = -235.0
+	_panel.offset_right = 200.0
+	_panel.offset_bottom = 235.0
 	_panel.theme = UiTheme.make_theme()
 
 	var vb := VBoxContainer.new()
-	vb.add_theme_constant_override("separation", 6)
+	vb.add_theme_constant_override("separation", 5)
 	_panel.add_child(vb)
 
 	var title := Label.new()
 	title.text = "设备元素库"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 24)
+	title.add_theme_font_size_override("font_size", 19)
 	vb.add_child(title)
 
 	_list = ItemList.new()
-	_list.custom_minimum_size = Vector2(0.0, 150.0)
+	_list.custom_minimum_size = Vector2(0.0, 125.0)
 	_list.item_selected.connect(_on_selected)
 	vb.add_child(_list)
 
@@ -62,8 +62,8 @@ func setup(lib: ElementLibrary, b: Builder, cc: CameraController, h: Hud) -> voi
 
 	var form := GridContainer.new()
 	form.columns = 2
-	form.add_theme_constant_override("h_separation", 8)
-	form.add_theme_constant_override("v_separation", 4)
+	form.add_theme_constant_override("h_separation", 6)
+	form.add_theme_constant_override("v_separation", 3)
 	form.add_child(_mk_label("名称"))
 	_name_edit = LineEdit.new()
 	_name_edit.placeholder_text = "如：CNC 加工中心"

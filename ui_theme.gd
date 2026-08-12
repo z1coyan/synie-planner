@@ -15,7 +15,7 @@ const WHITE := Color(1.0, 1.0, 1.0)
 
 static func make_theme() -> Theme:
 	var t := Theme.new()
-	t.default_font_size = 15
+	t.default_font_size = 13
 
 	t.set_stylebox("panel", "PanelContainer", panel_style())
 
@@ -52,13 +52,13 @@ static func make_theme() -> Theme:
 	t.set_stylebox("separator", "HSeparator", line)
 	return t
 
-static func panel_style(corner := 6) -> StyleBoxFlat:
+static func panel_style(corner := 5) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
 	s.bg_color = PANEL_BG
 	s.border_color = BORDER
 	s.set_border_width_all(1)
 	s.set_corner_radius_all(corner)
-	s.set_content_margin_all(12)
+	s.set_content_margin_all(8)
 	return s
 
 static func button_style(hovered := false, pressed := false) -> StyleBoxFlat:
@@ -72,7 +72,7 @@ static func button_style(hovered := false, pressed := false) -> StyleBoxFlat:
 	s.border_color = ACCENT if (hovered or pressed) else BORDER
 	s.set_border_width_all(1)
 	s.set_corner_radius_all(4)
-	s.set_content_margin_all(6)
+	s.set_content_margin_all(5)
 	return s
 
 static func input_style(focus := false) -> StyleBoxFlat:
@@ -81,10 +81,10 @@ static func input_style(focus := false) -> StyleBoxFlat:
 	s.border_color = ACCENT if focus else BORDER
 	s.set_border_width_all(1)
 	s.set_corner_radius_all(3)
-	s.content_margin_left = 8
-	s.content_margin_right = 8
-	s.content_margin_top = 4
-	s.content_margin_bottom = 4
+	s.content_margin_left = 6
+	s.content_margin_right = 6
+	s.content_margin_top = 3
+	s.content_margin_bottom = 3
 	return s
 
 static func slot_style(active := false, secondary := false) -> StyleBoxFlat:
@@ -97,6 +97,6 @@ static func slot_style(active := false, secondary := false) -> StyleBoxFlat:
 		s.bg_color = Color(0.96, 0.96, 0.97, 0.62)
 		s.border_color = Color(0.45, 0.46, 0.48) if secondary else BORDER
 		s.set_border_width_all(1)
-	s.set_corner_radius_all(6)
-	s.set_content_margin_all(6)
+	s.set_corner_radius_all(5)
+	s.set_content_margin_all(4)
 	return s
