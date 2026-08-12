@@ -14,6 +14,7 @@ const SLOT_DEFS := [
 	{"key": "7", "name": "3F", "icon": "floors", "param": 3},
 	{"key": "8", "name": "4F", "icon": "floors", "param": 4},
 	{"key": "9", "name": "全层", "icon": "showall"},
+	{"key": "X", "name": "拆除", "icon": "delete"},
 ]
 
 var _slots: Array = []
@@ -72,7 +73,7 @@ func _build_slot(def: Dictionary) -> PanelContainer:
 	p.add_child(vb)
 	return p
 
-## tool: "none" | "wall" | "column" | "device" | "opening"
+## tool: "none" | "wall" | "column" | "device" | "opening" | "delete"
 func set_state(tool: String, floor: int, show_all: bool) -> void:
 	for i in _slots.size():
 		var active := false
@@ -92,6 +93,8 @@ func set_state(tool: String, floor: int, show_all: bool) -> void:
 				secondary = not show_all and floor == i - 5
 			9:
 				secondary = show_all
+			10:
+				active = tool == "delete"
 		(_slots[i] as PanelContainer).add_theme_stylebox_override(
 			"panel", UiTheme.slot_style(active, secondary))
 		(_icons[i] as IconView).icon_color = UiTheme.ACCENT if (active or secondary) else UiTheme.TEXT

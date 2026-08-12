@@ -9,6 +9,7 @@ var menu: PauseMenu
 var floors: FloorManager
 var library: ElementLibrary
 var opening_tool: OpeningTool
+var delete_tool: DeleteTool
 var library_panel: LibraryPanel
 var hotbar: Hotbar
 
@@ -64,6 +65,12 @@ func _ready() -> void:
 	add_child(opening_tool)
 	opening_tool.setup(world, camera_rig, hud, floors)
 
+	delete_tool = DeleteTool.new()
+	delete_tool.name = "DeleteTool"
+	add_child(delete_tool)
+	delete_tool.setup(world, camera_rig, hud)
+	delete_tool.exit_requested.connect(_on_delete_exit)
+
 	library_panel = LibraryPanel.new()
 	library_panel.name = "LibraryPanel"
 	add_child(library_panel)
@@ -82,7 +89,11 @@ func _ready() -> void:
 
 func _on_floor_changed(index: int) -> void:
 	wall_tool.cancel()
+	delete_tool.cancel()
 	_update_floor_hud()
+
+func _on_delete_exit() -> void:
+	_set_tool("none")
 
 func _on_show_all_changed(value: bool) -> void:
 	_update_floor_hud()
@@ -179,6 +190,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_4:
 				_set_tool("opening")
 				get_viewport().set_input_as_handled()
+			KEY_X:
+				_set_tool("delete")
+				get_viewport().set_input_as_handled()
 			KEY_5:
 				floors.set_floor(0)
 				get_viewport().set_input_as_handled()
@@ -206,6 +220,7 @@ func _set_tool(t: String) -> void:
 	current_tool = t
 	wall_tool.set_active(t == "wall")
 	opening_tool.set_active(t == "opening")
+	delete_tool.set_active(t == "delete")
 	builder.set_tool("column" if t == "column" else "device" if t == "device" else "none")
 	hotbar.set_state(t, floors.current_floor, floors.show_all)
 	if t == "none":

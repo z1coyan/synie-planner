@@ -49,6 +49,12 @@ func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: floa
 	placed.append(body)
 	return body
 
+## 删除已放置物体：从仓库登记中移除并销毁节点。
+func remove(body: StaticBody3D) -> void:
+	placed.erase(body)
+	if is_instance_valid(body):
+		body.queue_free()
+
 func _add_label(body: StaticBody3D, size: Vector3, text: String) -> void:
 	var label := Label3D.new()
 	label.name = "Label"

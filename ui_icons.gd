@@ -15,6 +15,7 @@ static func draw(canvas: CanvasItem, icon: String, color: Color, size: float = 2
 		"column": _column(canvas, c, u, color)
 		"device": _device(canvas, c, u, color)
 		"opening": _opening(canvas, c, u, color)
+		"delete": _delete(canvas, c, u, color)
 		"floors": _floors(canvas, c, u, color, param)
 		"showall": _showall(canvas, c, u, color)
 
@@ -97,6 +98,22 @@ static func _opening(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> 
 	var r := Rect2(c + Vector2(-9.5 * u, -9.5 * u), Vector2(19.0 * u, 19.0 * u))
 	canvas.draw_rect(r, color, false, 2.0 * u)
 	canvas.draw_arc(c, 4.6 * u, 0.0, TAU, 28, color, 2.0 * u, true)
+
+## 拆除：垃圾桶（桶身梯形 + 盖子 + 提手 + 内部竖线）
+static func _delete(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> void:
+	var w := 2.0 * u
+	canvas.draw_line(c + Vector2(-7.0 * u, -5.0 * u), c + Vector2(7.0 * u, -5.0 * u), color, w, true)
+	canvas.draw_polyline(PackedVector2Array([
+		c + Vector2(-2.5 * u, -5.0 * u), c + Vector2(-2.5 * u, -8.5 * u),
+		c + Vector2(2.5 * u, -8.5 * u), c + Vector2(2.5 * u, -5.0 * u),
+	]), color, w, true)
+	canvas.draw_polyline(PackedVector2Array([
+		c + Vector2(-5.5 * u, -3.0 * u), c + Vector2(-4.0 * u, 8.0 * u),
+		c + Vector2(4.0 * u, 8.0 * u), c + Vector2(5.5 * u, -3.0 * u),
+		c + Vector2(-5.5 * u, -3.0 * u),
+	]), color, w, true)
+	canvas.draw_line(c + Vector2(-1.8 * u, -0.5 * u), c + Vector2(-1.2 * u, 5.5 * u), color, w * 0.7, true)
+	canvas.draw_line(c + Vector2(1.8 * u, -0.5 * u), c + Vector2(1.2 * u, 5.5 * u), color, w * 0.7, true)
 
 ## 楼层 N：自下而上叠放的楼板条
 static func _floors(canvas: CanvasItem, c: Vector2, u: float, color: Color, n: int) -> void:

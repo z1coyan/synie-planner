@@ -157,7 +157,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT and tool != "none" and valid:
 			_place()
 			get_viewport().set_input_as_handled()
-		elif event.button_index == MOUSE_BUTTON_RIGHT:
+		elif event.button_index == MOUSE_BUTTON_RIGHT and tool != "none":
 			set_tool("none")
 			get_viewport().set_input_as_handled()
 
