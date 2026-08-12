@@ -147,7 +147,7 @@ func _update_preview(end_point: Vector3) -> void:
 	)
 	var bs := BoxShape3D.new()
 	bs.size = size
-	var ok := world.shape_clear(bs, Transform3D(Basis(Vector3.UP, yaw), center), 0.0, [], ["wall", "column"])
+	var ok := world.shape_clear(bs, Transform3D(Basis(Vector3.UP, yaw), center), 0.0, [], ["wall", "column", "floor_tile"])
 	_preview_center = center
 	_preview_size = size
 	_preview_yaw = yaw

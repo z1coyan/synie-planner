@@ -96,8 +96,8 @@ func _physics_process(_delta: float) -> void:
 		snapped = world.snap_to_wall(snapped, Config.SNAP_TO_WALL)
 	var center := Vector3(snapped.x, aim["surface_y"] + size.y * 0.5, snapped.z)
 	var aabb := AABB(center - size * 0.5, size).grow(Config.CLEARANCE)
-	# 柱子允许与墙体相交（嵌入），设备仍检测全部干涉
-	var ignore: Array = ["wall"] if tool == "column" else []
+	# 柱子允许与墙体、地板相交（嵌入），设备仍检测全部干涉
+	var ignore: Array = ["wall", "floor_tile"] if tool == "column" else []
 	valid = world.aabb_clear(aabb, Config.CLEARANCE, [], ignore)
 	_show_preview(center, size, valid)
 	_update_hud()
