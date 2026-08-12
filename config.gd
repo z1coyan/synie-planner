@@ -4,9 +4,11 @@ extends RefCounted
 ## 全局尺寸、颜色、吸附参数统一入口。
 
 const GRID := 0.5
-const GRID_EXTENT := 200.0
 const GRID_MAJOR := 5.0
 const CLEARANCE := 0.05
+
+## 无限地面：巨型碰撞盒顶部对齐 1F 标高，等效无限建造区
+const GROUND_EXTENT := 20000.0
 
 const WALL_THICKNESS_DEFAULT := 0.2
 const WALL_THICKNESS_MIN := 0.1
@@ -17,6 +19,8 @@ const WALL_HEIGHT := 5.0
 const COLUMN_WIDTH := 0.4
 const COLUMN_DEPTH := 0.4
 const COLUMN_HEIGHT := 5.0
+## 柱子截面预设（米），E 键循环切换
+const COLUMN_SIZES := [0.4, 0.6, 0.8, 1.0]
 
 const DEVICE_SIZE := Vector3(2.0, 1.5, 1.0)
 

@@ -5,6 +5,7 @@ var _status: Label
 var _tool_info: Label
 var _length: Label
 var _floor: Label
+var _crosshair: Crosshair
 
 func setup() -> void:
 	layer = 40
@@ -40,6 +41,12 @@ func setup() -> void:
 	vb.add_child(_floor)
 	add_child(panel)
 
+	_crosshair = Crosshair.new()
+	_crosshair.name = "Crosshair"
+	_crosshair.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_crosshair.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_crosshair)
+
 func _make_label(size: int, color: Color) -> Label:
 	var l := Label.new()
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -58,3 +65,17 @@ func set_length(text: String) -> void:
 
 func set_floor_text(text: String) -> void:
 	_floor.text = text
+
+class Crosshair:
+	extends Control
+
+	## 屏幕中心准星：白色圆点，深色描边保证在浅色背景下清晰可见。
+
+	const RADIUS := 2.5
+	const RING_RADIUS := 4.5
+	const RING_WIDTH := 1.5
+
+	func _draw() -> void:
+		var c := size * 0.5
+		draw_arc(c, RING_RADIUS, 0.0, TAU, 24, Color(0.15, 0.16, 0.18, 0.85), RING_WIDTH, true)
+		draw_circle(c, RADIUS, Color.WHITE)

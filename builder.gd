@@ -12,6 +12,7 @@ var library: ElementLibrary
 
 var tool := "none"          # "none" | "column" | "device"
 var rot_steps := 0           # 0..3 → 旋转 0/90/180/270°
+var col_size_index := 0      # 柱子截面预设下标（Config.COLUMN_SIZES）
 var valid := false
 
 var _preview_root: Node3D
@@ -56,6 +57,7 @@ func _holo_mat(base: Color) -> StandardMaterial3D:
 func set_tool(t: String) -> void:
 	tool = t
 	rot_steps = 0
+	col_size_index = 0
 	_last_size = Vector3.ZERO
 	if tool == "none":
 		_preview_root.visible = false
@@ -64,7 +66,8 @@ func set_tool(t: String) -> void:
 func _current_size() -> Vector3:
 	var s: Vector3
 	if tool == "column":
-		s = Vector3(Config.COLUMN_WIDTH, Config.COLUMN_HEIGHT, Config.COLUMN_DEPTH)
+		var w: float = Config.COLUMN_SIZES[col_size_index]
+		s = Vector3(w, Config.COLUMN_HEIGHT, w)
 	else:
 		s = library.current_device()["size"]
 	if rot_steps % 2 == 1:
@@ -137,7 +140,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if get_viewport().gui_get_focus_owner() != null:
 		return
 	if event is InputEventKey and event.pressed and tool != "none":
-		if event.keycode == KEY_R:
+		if event.keycode == KEY_E and tool == "column":
+			col_size_index = (col_size_index + 1) % Config.COLUMN_SIZES.size()
+			_last_size = Vector3.ZERO
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_R:
 			rot_steps = (rot_steps + 1) % 4
 			_last_size = Vector3.ZERO
 			get_viewport().set_input_as_handled()
@@ -167,4 +174,8 @@ func _update_hud() -> void:
 		rot_steps * 90, _current_size().x, _current_size().y, _current_size().z,
 	]
 	hud.set_tool_info(label)
-	hud.set_status("放置：%s（绿色可放 / 红色干涉，R 旋转）" % (_current_name() if tool == "device" else name_map[tool]))
+	var hint := "放置：%s（绿色可放 / 红色干涉，R 旋转%s）" % [
+		_current_name() if tool == "device" else name_map[tool],
+		"，E 切截面尺寸" if tool == "column" else "",
+	]
+	hud.set_status(hint)

@@ -100,7 +100,7 @@ func toggle_labels() -> void:
 
 func top_surface_y(body: Node3D) -> float:
 	if body == ground_body:
-		return 0.0
+		return Config.FLOOR_TOP_OFFSET
 	if not body.has_meta("size"):
 		return 0.0
 	var size: Vector3 = body.get_meta("size")
@@ -123,7 +123,10 @@ func shape_clear(shape: Shape3D, xform: Transform3D, grow: float, exclude: Array
 	params.shape = shape
 	params.transform = xform
 	params.collision_mask = 1
-	params.exclude = exclude
+	var ex := exclude.duplicate()
+	if ground_body != null:
+		ex.append(ground_body)
+	params.exclude = ex
 	var hits := space.intersect_shape(params, 16)
 	if exclude_kind == "":
 		return hits.is_empty()

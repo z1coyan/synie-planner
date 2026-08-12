@@ -23,7 +23,7 @@ func _ready() -> void:
 	var content := Node3D.new()
 	content.name = "Content"
 	add_child(content)
-	world.setup(content, null)
+	world.setup(content, _build_ground())
 
 	floors = FloorManager.new()
 	floors.name = "FloorManager"
@@ -37,6 +37,7 @@ func _ready() -> void:
 	camera_rig.name = "CameraRig"
 	add_child(camera_rig)
 	camera_rig.setup()
+	floors.set_camera(camera_rig)
 
 	hud = Hud.new()
 	hud.name = "Hud"
@@ -89,6 +90,25 @@ func _on_show_all_changed(value: bool) -> void:
 func _update_floor_hud() -> void:
 	hud.set_floor_text("楼层: %dF   显示: %s" % [floors.current_floor + 1, "全部" if floors.show_all else "单层"])
 	hotbar.set_state(current_tool, floors.current_floor, floors.show_all)
+
+## 无限地面：巨型静碰撞盒，顶面与 1F 标高对齐，作为无限建造基准面。
+func _build_ground() -> StaticBody3D:
+	var ground := StaticBody3D.new()
+	ground.name = "Ground"
+	ground.collision_layer = 1
+	ground.collision_mask = 0
+	var shape := BoxShape3D.new()
+	var thickness := 1.0
+	shape.size = Vector3(Config.GROUND_EXTENT, thickness, Config.GROUND_EXTENT)
+	ground.position.y = Config.FLOOR_TOP_OFFSET - thickness * 0.5
+	var cs := CollisionShape3D.new()
+	cs.name = "Collision"
+	cs.shape = shape
+	ground.add_child(cs)
+	ground.set_meta("kind", "ground")
+	ground.set_meta("size", shape.size)
+	add_child(ground)
+	return ground
 
 func _build_environment() -> void:
 	var env := Environment.new()
