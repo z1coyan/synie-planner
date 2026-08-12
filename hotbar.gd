@@ -1,19 +1,14 @@
 class_name Hotbar
 extends CanvasLayer
 
-## Satisfactory 风格底部快捷栏：0-9 槽位，高亮当前工具 / 楼层 / 全层状态。
+## Satisfactory 风格底部快捷栏：0-4 / X 槽位，高亮当前工具。
 
 const SLOT_DEFS := [
 	{"key": "0", "name": "取消", "icon": "cancel"},
 	{"key": "1", "name": "墙体", "icon": "wall"},
 	{"key": "2", "name": "立柱", "icon": "column"},
 	{"key": "3", "name": "设备", "icon": "device"},
-	{"key": "4", "name": "开洞", "icon": "opening"},
-	{"key": "5", "name": "1F", "icon": "floors", "param": 1},
-	{"key": "6", "name": "2F", "icon": "floors", "param": 2},
-	{"key": "7", "name": "3F", "icon": "floors", "param": 3},
-	{"key": "8", "name": "4F", "icon": "floors", "param": 4},
-	{"key": "9", "name": "全层", "icon": "showall"},
+	{"key": "4", "name": "地板", "icon": "floor_tile"},
 	{"key": "X", "name": "拆除", "icon": "delete"},
 ]
 
@@ -40,7 +35,7 @@ func setup() -> void:
 		_slots.append(slot)
 		root.add_child(slot)
 	add_child(root)
-	set_state("column", 0, false)
+	set_state("column")
 
 func _build_slot(def: Dictionary) -> PanelContainer:
 	var p := PanelContainer.new()
@@ -73,11 +68,10 @@ func _build_slot(def: Dictionary) -> PanelContainer:
 	p.add_child(vb)
 	return p
 
-## tool: "none" | "wall" | "column" | "device" | "opening" | "delete"
-func set_state(tool: String, floor: int, show_all: bool) -> void:
+## tool: "none" | "wall" | "column" | "device" | "floor_tile" | "delete"
+func set_state(tool: String) -> void:
 	for i in _slots.size():
 		var active := false
-		var secondary := false
 		match i:
 			0:
 				active = tool == "none"
@@ -88,16 +82,12 @@ func set_state(tool: String, floor: int, show_all: bool) -> void:
 			3:
 				active = tool == "device"
 			4:
-				active = tool == "opening"
-			5, 6, 7, 8:
-				secondary = not show_all and floor == i - 5
-			9:
-				secondary = show_all
-			10:
+				active = tool == "floor_tile"
+			5:
 				active = tool == "delete"
 		(_slots[i] as PanelContainer).add_theme_stylebox_override(
-			"panel", UiTheme.slot_style(active, secondary))
-		(_icons[i] as IconView).icon_color = UiTheme.ACCENT if (active or secondary) else UiTheme.TEXT
+			"panel", UiTheme.slot_style(active, false))
+		(_icons[i] as IconView).icon_color = UiTheme.ACCENT if active else UiTheme.TEXT
 		(_icons[i] as IconView).queue_redraw()
 
 class IconView:

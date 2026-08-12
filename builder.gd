@@ -2,12 +2,11 @@ class_name Builder
 extends Node3D
 
 ## 柱子 / 设备放置：全息预览跟随鼠标，0.5m 网格吸附 + 表面吸附，
-## R 键旋转 90°，绿=可放，红=干涉。设备尺寸/颜色取自元素库，自动归属楼层。
+## R 键旋转 90°，绿=可放，红=干涉。设备尺寸/颜色取自元素库。
 
 var world: WorldStore
 var camera_rig: CameraController
 var hud: Hud
-var floors: FloorManager
 var library: ElementLibrary
 
 var tool := "none"          # "none" | "column" | "device"
@@ -22,11 +21,10 @@ var _fill_mat_ok: StandardMaterial3D
 var _fill_mat_bad: StandardMaterial3D
 var _last_size := Vector3.ZERO
 
-func setup(w: WorldStore, cc: CameraController, h: Hud, fm: FloorManager, lib: ElementLibrary) -> void:
+func setup(w: WorldStore, cc: CameraController, h: Hud, lib: ElementLibrary) -> void:
 	world = w
 	camera_rig = cc
 	hud = h
-	floors = fm
 	library = lib
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
@@ -165,9 +163,7 @@ func _place() -> void:
 	if not _preview_root.visible:
 		return
 	var size := _current_size()
-	var bottom_y := _preview_root.position.y - size.y * 0.5
-	var floor := floors.floor_from_y(bottom_y)
-	world.place_box(_preview_root.position, size, _current_color(), tool, 0.0, floor, _current_name())
+	world.place_box(_preview_root.position, size, _current_color(), tool, 0.0, 0, _current_name())
 
 func _update_hud() -> void:
 	var name_map := {"none": "无", "column": "柱子", "device": "设备"}

@@ -4,7 +4,6 @@ extends CanvasLayer
 var _status: Label
 var _tool_info: Label
 var _length: Label
-var _floor: Label
 var _crosshair: Crosshair
 
 func setup() -> void:
@@ -34,11 +33,9 @@ func setup() -> void:
 	_status = _make_label(15, UiTheme.ACCENT)
 	_tool_info = _make_label(12, UiTheme.TEXT)
 	_length = _make_label(12, UiTheme.TEXT)
-	_floor = _make_label(12, Color(0.20, 0.78, 0.85))
 	vb.add_child(_status)
 	vb.add_child(_tool_info)
 	vb.add_child(_length)
-	vb.add_child(_floor)
 	add_child(panel)
 
 	_crosshair = Crosshair.new()
@@ -62,9 +59,6 @@ func set_tool_info(text: String) -> void:
 
 func set_length(text: String) -> void:
 	_length.text = text
-
-func set_floor_text(text: String) -> void:
-	_floor.text = text
 
 class Crosshair:
 	extends Control

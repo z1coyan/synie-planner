@@ -4,11 +4,11 @@ var world: WorldStore
 var camera_rig: CameraController
 var builder: Builder
 var wall_tool: WallTool
+var floor_tile_tool: FloorTileTool
 var hud: Hud
 var menu: PauseMenu
-var floors: FloorManager
+var ground_grid: GroundGrid
 var library: ElementLibrary
-var opening_tool: OpeningTool
 var delete_tool: DeleteTool
 var library_panel: LibraryPanel
 var hotbar: Hotbar
@@ -26,10 +26,10 @@ func _ready() -> void:
 	add_child(content)
 	world.setup(content, _build_ground())
 
-	floors = FloorManager.new()
-	floors.name = "FloorManager"
-	add_child(floors)
-	floors.setup(world)
+	ground_grid = GroundGrid.new()
+	ground_grid.name = "GroundGrid"
+	add_child(ground_grid)
+	ground_grid.setup()
 
 	library = ElementLibrary.new()
 	library.setup()
@@ -38,7 +38,7 @@ func _ready() -> void:
 	camera_rig.name = "CameraRig"
 	add_child(camera_rig)
 	camera_rig.setup()
-	floors.set_camera(camera_rig)
+	ground_grid.set_camera(camera_rig)
 
 	hud = Hud.new()
 	hud.name = "Hud"
@@ -53,17 +53,17 @@ func _ready() -> void:
 	builder = Builder.new()
 	builder.name = "Builder"
 	add_child(builder)
-	builder.setup(world, camera_rig, hud, floors, library)
+	builder.setup(world, camera_rig, hud, library)
 
 	wall_tool = WallTool.new()
 	wall_tool.name = "WallTool"
 	add_child(wall_tool)
-	wall_tool.setup(world, camera_rig, hud, floors)
+	wall_tool.setup(world, camera_rig, hud)
 
-	opening_tool = OpeningTool.new()
-	opening_tool.name = "OpeningTool"
-	add_child(opening_tool)
-	opening_tool.setup(world, camera_rig, hud, floors)
+	floor_tile_tool = FloorTileTool.new()
+	floor_tile_tool.name = "FloorTileTool"
+	add_child(floor_tile_tool)
+	floor_tile_tool.setup(world, camera_rig, hud)
 
 	delete_tool = DeleteTool.new()
 	delete_tool.name = "DeleteTool"
@@ -81,28 +81,12 @@ func _ready() -> void:
 	add_child(menu)
 	menu.setup(camera_rig)
 
-	floors.floor_changed.connect(_on_floor_changed)
-	floors.show_all_changed.connect(_on_show_all_changed)
-
 	_set_tool("column")
-	_update_floor_hud()
-
-func _on_floor_changed(index: int) -> void:
-	wall_tool.cancel()
-	delete_tool.cancel()
-	_update_floor_hud()
 
 func _on_delete_exit() -> void:
 	_set_tool("none")
 
-func _on_show_all_changed(value: bool) -> void:
-	_update_floor_hud()
-
-func _update_floor_hud() -> void:
-	hud.set_floor_text("楼层: %dF   显示: %s" % [floors.current_floor + 1, "全部" if floors.show_all else "单层"])
-	hotbar.set_state(current_tool, floors.current_floor, floors.show_all)
-
-## 无限地面：巨型静碰撞盒，顶面与 1F 标高对齐，作为无限建造基准面。
+## 无限地面：巨型静碰撞盒，顶面与地面标高对齐，作为无限建造基准面。
 func _build_ground() -> StaticBody3D:
 	var ground := StaticBody3D.new()
 	ground.name = "Ground"
@@ -188,25 +172,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_set_tool("device")
 				get_viewport().set_input_as_handled()
 			KEY_4:
-				_set_tool("opening")
+				_set_tool("floor_tile")
 				get_viewport().set_input_as_handled()
 			KEY_X:
 				_set_tool("delete")
-				get_viewport().set_input_as_handled()
-			KEY_5:
-				floors.set_floor(0)
-				get_viewport().set_input_as_handled()
-			KEY_6:
-				floors.set_floor(1)
-				get_viewport().set_input_as_handled()
-			KEY_7:
-				floors.set_floor(2)
-				get_viewport().set_input_as_handled()
-			KEY_8:
-				floors.set_floor(3)
-				get_viewport().set_input_as_handled()
-			KEY_9:
-				floors.toggle_show_all()
 				get_viewport().set_input_as_handled()
 			KEY_B:
 				library_panel.toggle()
@@ -219,9 +188,9 @@ func _unhandled_input(event: InputEvent) -> void:
 func _set_tool(t: String) -> void:
 	current_tool = t
 	wall_tool.set_active(t == "wall")
-	opening_tool.set_active(t == "opening")
+	floor_tile_tool.set_active(t == "floor_tile")
 	delete_tool.set_active(t == "delete")
 	builder.set_tool("column" if t == "column" else "device" if t == "device" else "none")
-	hotbar.set_state(t, floors.current_floor, floors.show_all)
+	hotbar.set_state(t)
 	if t == "none":
-		hud.set_status("无工具（0-9 快捷栏选择工具与楼层）")
+		hud.set_status("无工具（0-4 / X 快捷栏选择工具）")

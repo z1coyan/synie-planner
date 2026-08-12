@@ -14,10 +14,8 @@ static func draw(canvas: CanvasItem, icon: String, color: Color, size: float = 2
 		"wall": _wall(canvas, c, u, color)
 		"column": _column(canvas, c, u, color)
 		"device": _device(canvas, c, u, color)
-		"opening": _opening(canvas, c, u, color)
+		"floor_tile": _floor_tile(canvas, c, u, color)
 		"delete": _delete(canvas, c, u, color)
-		"floors": _floors(canvas, c, u, color, param)
-		"showall": _showall(canvas, c, u, color)
 
 ## 取消：外圈 + 斜叉
 static func _cancel(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> void:
@@ -93,11 +91,25 @@ static func _device(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> v
 	canvas.draw_rect(scr, color, true)
 	canvas.draw_circle(Vector2(body.end.x - 2.6 * u, body.get_center().y), 2.2 * u, color)
 
-## 开洞：楼板（方形轮廓）上开圆形吊装孔
-static func _opening(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> void:
-	var r := Rect2(c + Vector2(-9.5 * u, -9.5 * u), Vector2(19.0 * u, 19.0 * u))
-	canvas.draw_rect(r, color, false, 2.0 * u)
-	canvas.draw_arc(c, 4.6 * u, 0.0, TAU, 28, color, 2.0 * u, true)
+## 地板：扁平轴测楼板（顶面受光、左右面渐暗），顶面 2×2 分格
+static func _floor_tile(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> void:
+	var hw := 8.0 * u
+	var hi := 3.0 * u
+	var ch := 2.2 * u
+	var apex := c + Vector2(0.0, -2.0 * hi)
+	var fr := c + Vector2(hw, -hi)
+	var bc := c + Vector2(0.0, 0.0)
+	var bl := c + Vector2(-hw, -hi)
+	var frb := fr + Vector2(0.0, ch)
+	var bcb := bc + Vector2(0.0, ch)
+	var blb := bl + Vector2(0.0, ch)
+	canvas.draw_colored_polygon(PackedVector2Array([apex, fr, bc, bl]), color.lightened(0.1))
+	canvas.draw_colored_polygon(PackedVector2Array([bl, bc, bcb, blb]), color.darkened(0.15))
+	canvas.draw_colored_polygon(PackedVector2Array([bc, fr, frb, bcb]), color.darkened(0.35))
+	var grid_col := color.darkened(0.3)
+	canvas.draw_line((apex + bl) * 0.5, (fr + bc) * 0.5, grid_col, 1.0 * u, true)
+	canvas.draw_line((apex + fr) * 0.5, (bl + bc) * 0.5, grid_col, 1.0 * u, true)
+	canvas.draw_polyline(PackedVector2Array([apex, fr, frb, bcb, blb, bl, apex]), color, 1.2 * u, true)
 
 ## 拆除：垃圾桶（桶身梯形 + 盖子 + 提手 + 内部竖线）
 static func _delete(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> void:
@@ -114,25 +126,3 @@ static func _delete(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> v
 	]), color, w, true)
 	canvas.draw_line(c + Vector2(-1.8 * u, -0.5 * u), c + Vector2(-1.2 * u, 5.5 * u), color, w * 0.7, true)
 	canvas.draw_line(c + Vector2(1.8 * u, -0.5 * u), c + Vector2(1.2 * u, 5.5 * u), color, w * 0.7, true)
-
-## 楼层 N：自下而上叠放的楼板条
-static func _floors(canvas: CanvasItem, c: Vector2, u: float, color: Color, n: int) -> void:
-	var bw := 13.0 * u
-	var bh := 3.0 * u
-	var step := 4.5 * u
-	var x := c.x - bw * 0.5
-	for i in range(maxi(n, 1)):
-		var y := c.y + 5.0 * u - i * step
-		canvas.draw_rect(Rect2(x, y, bw, bh), color, true)
-
-## 全层：四层楼板条置于外框内
-static func _showall(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> void:
-	var bw := 11.0 * u
-	var bh := 2.6 * u
-	var step := 4.0 * u
-	var x := c.x - bw * 0.5
-	for i in range(4):
-		var y := c.y + 4.5 * u - i * step
-		canvas.draw_rect(Rect2(x, y, bw, bh), color, true)
-	var box := Rect2(c + Vector2(-8.5 * u, -8.5 * u), Vector2(17.0 * u, 17.0 * u))
-	canvas.draw_rect(box, color, false, 1.8 * u)

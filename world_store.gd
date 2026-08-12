@@ -158,6 +158,30 @@ func snap_to_kind(p: Vector3, kind: String, max_dist: float) -> Vector3:
 			best = Vector3(c.x, p.y, c.z)
 	return best
 
+## 磁吸：若 p（XZ 平面）距某指定 kinds 物体的角点小于 max_dist，
+## 返回最近的角点；否则返回 p。角点取物体底面矩形四角（考虑 yaw 旋转）。
+func snap_to_corners(p: Vector3, kinds: Array, max_dist: float) -> Vector3:
+	var best := p
+	var best_d := max_dist
+	for obj in placed:
+		if not obj.has_meta("kind") or not kinds.has(obj.get_meta("kind")):
+			continue
+		for corner in obb_corners(obj):
+			var d := Vector2(p.x - corner.x, p.z - corner.z).length()
+			if d < best_d:
+				best_d = d
+				best = Vector3(corner.x, p.y, corner.z)
+	return best
+
+## 物体底面矩形的四个角点（考虑 yaw 旋转）。
+static func obb_corners(obj: StaticBody3D) -> Array:
+	var size: Vector3 = obj.get_meta("size")
+	var yaw: float = obj.get_meta("yaw")
+	var c: Vector3 = obj.global_position
+	var dx := Vector3(cos(yaw), 0.0, -sin(yaw)) * size.x * 0.5
+	var dz := Vector3(sin(yaw), 0.0, cos(yaw)) * size.z * 0.5
+	return [c + dx + dz, c + dx - dz, c - dx + dz, c - dx - dz]
+
 ## 磁吸：若 p（XZ 平面）距某面墙的中心线段小于 max_dist，
 ## 返回该线段上最近的点（钳制在墙段范围内）；否则返回 p。
 func snap_to_wall(p: Vector3, max_dist: float) -> Vector3:

@@ -1,14 +1,14 @@
 class_name DeleteTool
 extends Node3D
 
-## 拆除工具：X 键进入。左键点选墙体/柱子/设备立即删除；
+## 拆除工具：X 键进入。左键点选墙体/柱子/设备/地板立即删除；
 ## 在空白处按住左键拖拽出矩形框，松开批量删除框内物体（框选过程实时橙色高亮 + 计数）。
-## 右键 / X / 0 退出工具。隐藏楼层的物体不参与点选与框选。
+## 右键 / X / 0 退出工具。不可见（无碰撞层）的物体不参与点选与框选。
 
 signal exit_requested
 
-const DELETABLE_KINDS := ["wall", "column", "device"]
-const KIND_NAMES := {"wall": "墙体", "column": "柱子", "device": "设备"}
+const DELETABLE_KINDS := ["wall", "column", "device", "floor_tile"]
+const KIND_NAMES := {"wall": "墙体", "column": "柱子", "device": "设备", "floor_tile": "地板"}
 
 var world: WorldStore
 var camera_rig: CameraController
@@ -118,7 +118,7 @@ func _drag_rect() -> Rect2:
 	var cur := get_viewport().get_mouse_position()
 	return Rect2(_drag_start, cur - _drag_start).abs()
 
-## 屏幕矩形内的可删物体（仅当前可见楼层）
+## 屏幕矩形内的可删物体（仅当前可见、有碰撞层的物体）
 func _marquee_victims(rect: Rect2) -> Array:
 	var cam: Camera3D = camera_rig.camera
 	var victims: Array = []

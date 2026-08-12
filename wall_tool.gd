@@ -2,12 +2,11 @@ class_name WallTool
 extends Node3D
 
 ## 墙体：连续点击绘制，起点/终点有可视化标记，实时显示长度，[ ] 调整墙厚。
-## 墙面基准高度取起点所在表面，自动归属楼层。
+## 墙面基准高度取起点所在表面；端点磁吸墙/柱/地板角点与柱心。
 
 var world: WorldStore
 var camera_rig: CameraController
 var hud: Hud
-var floors: FloorManager
 
 var active := false
 var drawing := false
@@ -31,11 +30,10 @@ var _preview_yaw := 0.0
 var _preview_ok := false
 var _preview_end := Vector3.ZERO
 
-func setup(w: WorldStore, cc: CameraController, h: Hud, fm: FloorManager) -> void:
+func setup(w: WorldStore, cc: CameraController, h: Hud) -> void:
 	world = w
 	camera_rig = cc
 	hud = h
-	floors = fm
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
 	_preview_root = Node3D.new()
@@ -78,7 +76,7 @@ func set_active(a: bool) -> void:
 	if not a:
 		_cancel()
 	else:
-		hud.set_status("画墙：连续点击端点，实时显示长度")
+		hud.set_status("画墙：连续点击端点（磁吸角点/柱心），实时显示长度")
 		_update_hud()
 
 func cancel() -> void:
@@ -112,13 +110,17 @@ func _physics_process(_delta: float) -> void:
 	if drawing:
 		_update_preview(snapped)
 
+## 端点吸附顺序：角点磁吸（基于原始点，墙/柱/地板角点）→ 0.5m 网格 → 柱心磁吸。
 func _snap_grid(p: Vector3) -> Vector3:
+	var corner := world.snap_to_corners(p, ["column", "wall", "floor_tile"], Config.SNAP_TO_CORNER)
+	if corner != p:
+		return corner
 	var g := Config.GRID
 	var s := Vector3(roundf(p.x / g) * g, 0.0, roundf(p.z / g) * g)
 	# 端点磁吸到附近柱心，使墙端嵌入柱内、消除接缝
 	return world.snap_to_kind(s, "column", Config.SNAP_TO_COLUMN)
 
-## 画墙基准高度：起点落在柱子上时取柱底（即楼板面），
+## 画墙基准高度：起点落在柱子上时取柱底（即支撑面），
 ## 使墙能从柱子里拉出来，而不是悬在柱顶。
 func _surface_base_y(aim: Dictionary) -> float:
 	var body: Object = aim.get("body")
@@ -203,7 +205,7 @@ func _on_left_click() -> void:
 		return
 	if not _preview_ok or not _preview_root.visible:
 		return
-	world.place_box(_preview_center, _preview_size, Config.COLOR_WALL, "wall", _preview_yaw, floors.floor_from_y(base_y))
+	world.place_box(_preview_center, _preview_size, Config.COLOR_WALL, "wall", _preview_yaw)
 	start_point = _preview_end
 	_last_size = Vector3.ZERO
 	_preview_ok = false

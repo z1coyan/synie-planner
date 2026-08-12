@@ -10,6 +10,8 @@ const CLEARANCE := 0.05
 ## 磁吸阈值（米）：墙端点吸附柱心 / 柱子吸附墙中心线，使墙柱互相嵌入、消除接缝
 const SNAP_TO_COLUMN := 0.25
 const SNAP_TO_WALL := 0.3
+## 地板端点吸附柱子 / 墙体 / 其他地板角点的阈值
+const SNAP_TO_CORNER := 0.35
 
 ## 无限地面：巨型碰撞盒顶部对齐 1F 标高，等效无限建造区
 const GROUND_EXTENT := 20000.0
@@ -52,21 +54,8 @@ const COLOR_PATH := Color(0.20, 0.78, 0.85, 1.0)       # 青色：物流路径
 const COLOR_OK := Color(0.96, 0.60, 0.15, 0.35)
 const COLOR_BAD := Color(0.35, 0.36, 0.38, 0.45)
 
-const FLOOR_COUNT := 4
-const FLOOR_HEIGHT := 5.0
 const FLOOR_THICKNESS := 0.3
 const FLOOR_TOP_OFFSET := 0.3
-const FLOOR_SIZE := Vector2(90.0, 50.0)
-const SLAB_CELL := 0.5
 
 const COLOR_FLOOR := Color(0.86, 0.87, 0.89, 1.0)
 const COLOR_FLOOR_GRID := Color(0.66, 0.67, 0.69, 0.55)
-const COLOR_OPENING := Color(0.96, 0.60, 0.15, 1.0)
-
-const OPENING_TYPES := [
-	{"name": "吊装孔", "size": Vector2(3.0, 3.0)},
-	{"name": "输送井", "size": Vector2(2.0, 2.0)},
-]
-const OPENING_SIZE_MIN := 0.5
-const OPENING_SIZE_MAX := 20.0
-const OPENING_SIZE_STEP := 0.5
