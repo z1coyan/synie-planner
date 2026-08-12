@@ -3,6 +3,8 @@ extends Node3D
 
 ## 已放置物体的统一仓库：负责创建碰撞体、查询干涉、拾取表面。
 
+const MATERIAL_KINDS := ["floor_tile", "column", "wall"]
+
 var content: Node3D
 var ground_body: StaticBody3D
 var placed: Array = []
@@ -12,17 +14,28 @@ func setup(content_parent: Node3D, ground: StaticBody3D) -> void:
 	content = content_parent
 	ground_body = ground
 
-func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: float = 0.0, floor: int = 0, name: String = "") -> StaticBody3D:
+func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: float = 0.0, floor: int = 0, name: String = "", material: String = "") -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.name = "%s_%d" % [kind, body.get_instance_id()]
 	body.position = cx
 	body.collision_layer = 1
 	body.collision_mask = 0
 
+	var mat_id := ""
+	if material != "":
+		mat_id = Config.normalize_material(material)
+	elif MATERIAL_KINDS.has(kind):
+		mat_id = Config.DEFAULT_MATERIAL
+
 	var mi := MeshInstance3D.new()
 	var bm := BoxMesh.new()
 	bm.size = size
-	var mat := _clay_mat(color)
+	var mat: StandardMaterial3D
+	if mat_id != "":
+		mat = _surface_mat(mat_id)
+		color = mat.albedo_color
+	else:
+		mat = _clay_mat(color)
 	bm.material = mat
 	mi.mesh = bm
 	body.add_child(mi)
@@ -42,12 +55,82 @@ func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: floa
 	body.set_meta("color", color)
 	body.set_meta("yaw", yaw)
 	body.set_meta("floor", floor)
+	if mat_id != "":
+		body.set_meta("material", mat_id)
 	if kind == "device":
 		body.set_meta("name", name if name != "" else "设备")
 		_add_label(body, size, body.get_meta("name"))
 	content.add_child(body)
 	placed.append(body)
 	return body
+
+## 立即更新柱/墙/地板的材质外观与 meta。
+func set_body_material(body: StaticBody3D, material_id: String) -> void:
+	if body == null or not is_instance_valid(body):
+		return
+	if not body.has_meta("kind") or not MATERIAL_KINDS.has(body.get_meta("kind")):
+		return
+	var mat_id := Config.normalize_material(material_id)
+	var mat := _surface_mat(mat_id)
+	body.set_meta("material", mat_id)
+	body.set_meta("color", mat.albedo_color)
+	for child in body.get_children():
+		if String(child.name) == "_SelectHL":
+			continue
+		if child is MeshInstance3D and child.mesh is BoxMesh:
+			var bm: BoxMesh = child.mesh
+			bm.material = mat
+			child.material_override = null
+
+
+## 按逻辑尺寸更新柱/墙/地板几何（立即生效，底面或顶面尽量保持）。
+## dims: column/wall → height, thickness；floor_tile → thickness。墙长度保持不变。
+func set_body_dims(body: StaticBody3D, dims: Dictionary) -> void:
+	if body == null or not is_instance_valid(body):
+		return
+	if not body.has_meta("kind"):
+		return
+	var kind: String = body.get_meta("kind")
+	if not MATERIAL_KINDS.has(kind):
+		return
+	var old_size: Vector3 = body.get_meta("size")
+	var yaw: float = float(body.get_meta("yaw")) if body.has_meta("yaw") else 0.0
+	var new_size := old_size
+	var pos := body.global_position
+	match kind:
+		"column":
+			var h := float(dims.get("height", Config.COLUMN_HEIGHT))
+			var t := float(dims.get("thickness", Config.COLUMN_SIZES[0]))
+			var base_y := pos.y - old_size.y * 0.5
+			new_size = Vector3(t + Config.EMBED * 2.0, h + Config.EMBED * 2.0, t + Config.EMBED * 2.0)
+			pos.y = base_y + new_size.y * 0.5
+		"wall":
+			var h2 := float(dims.get("height", Config.WALL_HEIGHT))
+			var th := float(dims.get("thickness", Config.WALL_THICKNESS_DEFAULT))
+			var length := maxf(old_size.x - Config.EMBED * 2.0, Config.GRID)
+			var base_y2 := pos.y - old_size.y * 0.5 + Config.EMBED
+			new_size = Vector3(length + Config.EMBED * 2.0, h2 + Config.EMBED, th)
+			pos.y = base_y2 + new_size.y * 0.5 - Config.EMBED
+		"floor_tile":
+			var th2 := float(dims.get("thickness", Config.FLOOR_THICKNESS))
+			var h3 := th2 + Config.EMBED
+			# 保持顶面标高（与铺设一致）
+			var top_y := pos.y + old_size.y * 0.5
+			new_size = Vector3(old_size.x, h3, old_size.z)
+			pos.y = top_y - h3 * 0.5
+		_:
+			return
+	body.global_position = pos
+	body.set_meta("size", new_size)
+	for child in body.get_children():
+		if String(child.name) == "_SelectHL":
+			continue
+		if child is MeshInstance3D and child.mesh is BoxMesh:
+			(child.mesh as BoxMesh).size = new_size
+			child.rotation.y = yaw
+		elif child is CollisionShape3D and child.shape is BoxShape3D:
+			(child.shape as BoxShape3D).size = new_size
+			child.rotation.y = yaw
 
 ## 删除已放置物体：从仓库登记中移除并销毁节点。
 func remove(body: StaticBody3D) -> void:
@@ -92,6 +175,21 @@ func _clay_mat(color: Color) -> StandardMaterial3D:
 	m.roughness = 0.9
 	m.metallic = 0.0
 	return m
+
+## 柱/墙/地板共用材质外观：混凝土冷灰 / 泥土棕。
+func _surface_mat(material: String) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	m.metallic = 0.0
+	if Config.normalize_material(material) == "dirt":
+		m.albedo_color = Config.COLOR_FLOOR_DIRT
+		m.roughness = 0.95
+	else:
+		m.albedo_color = Config.COLOR_FLOOR_CONCRETE
+		m.roughness = 0.85
+	return m
+
+func _floor_mat(material: String) -> StandardMaterial3D:
+	return _surface_mat(material)
 
 func toggle_labels() -> void:
 	labels_visible = not labels_visible

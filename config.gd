@@ -46,9 +46,9 @@ const MOUSE_SENS := 0.002
 ## 白模配色纪律：建筑/设备一律灰白（明度 0.75~0.95），
 ## 仅允许橙色（选中/悬停高亮）与青色（物流路径）两个强调色。
 
-const COLOR_GROUND := Color(0.85, 0.86, 0.88, 1.0)
+const COLOR_GROUND := Color(0.42, 0.34, 0.24, 1.0)
 const COLOR_GRID_MINOR := Color(0.72, 0.73, 0.75, 1.0)
-const COLOR_GRID_MAJOR := Color(0.60, 0.61, 0.63, 1.0)
+const COLOR_GRID_MAJOR := Color(0.28, 0.30, 0.22, 0.70)
 const COLOR_AXIS := Color(0.52, 0.53, 0.55, 1.0)
 const COLOR_WALL := Color(0.89, 0.90, 0.91, 1.0)
 const COLOR_COLUMN := Color(0.80, 0.81, 0.83, 1.0)
@@ -61,5 +61,27 @@ const COLOR_BAD := Color(0.35, 0.36, 0.38, 0.45)
 const FLOOR_THICKNESS := 0.3
 const FLOOR_TOP_OFFSET := 0.3
 
-const COLOR_FLOOR := Color(0.86, 0.87, 0.89, 1.0)
-const COLOR_FLOOR_GRID := Color(0.66, 0.67, 0.69, 0.55)
+## 默认地板色：偏混凝土灰（非纯白盒白）
+const COLOR_FLOOR := Color(0.60, 0.61, 0.63, 1.0)
+## 混凝土：冷灰，略深于旧白模地板
+const COLOR_FLOOR_CONCRETE := Color(0.58, 0.59, 0.62, 1.0)
+## 泥土：贴近地面泥土棕
+const COLOR_FLOOR_DIRT := Color(0.40, 0.30, 0.20, 1.0)
+const COLOR_FLOOR_GRID := Color(0.32, 0.34, 0.24, 0.50)
+
+## 柱/墙/地板共用材质 id
+const MATERIAL_IDS := ["dirt", "concrete"]
+const DEFAULT_MATERIAL := "concrete"
+
+static func normalize_material(material_id: String) -> String:
+	if material_id == "dirt":
+		return "dirt"
+	return DEFAULT_MATERIAL
+
+static func material_label(material_id: String) -> String:
+	return "泥土" if normalize_material(material_id) == "dirt" else "混凝土"
+
+static func material_color(material_id: String) -> Color:
+	if normalize_material(material_id) == "dirt":
+		return COLOR_FLOOR_DIRT
+	return COLOR_FLOOR_CONCRETE

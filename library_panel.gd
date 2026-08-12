@@ -3,6 +3,8 @@ extends CanvasLayer
 
 ## 元素库面板：列出设备类型、选择当前放置设备、新增/删除设备类型（纯代码 UI）。
 
+signal device_selected
+
 var library: ElementLibrary
 var builder: Builder
 var camera_rig: CameraController
@@ -158,6 +160,7 @@ func _on_selected(index: int) -> void:
 	_update_info()
 	builder.refresh_device()
 	hud.set_status("选择设备：%s" % library.current_device().name)
+	device_selected.emit()
 
 func _on_add() -> void:
 	var ok := library.add_device(

@@ -3,16 +3,22 @@ extends Node3D
 
 ## 墙体：连续点击绘制，起点/终点有可视化标记，实时显示长度，[ ] 调整墙厚。
 ## 墙面基准高度取起点所在表面；端点磁吸墙/柱/地板角点与柱心。
+## 右键：绘制中取消当前笔画；空闲时 exit_requested 切回「无」。
+
+signal exit_requested
 
 var world: WorldStore
 var camera_rig: CameraController
 var hud: Hud
+var host: Node
 
 var active := false
 var drawing := false
 var start_point: Vector3
 var thickness := Config.WALL_THICKNESS_DEFAULT
+var wall_height := Config.WALL_HEIGHT
 var base_y := 0.0
+var material_id := Config.DEFAULT_MATERIAL
 
 var _preview_root: Node3D
 var _fill_mi: MeshInstance3D
@@ -30,10 +36,11 @@ var _preview_yaw := 0.0
 var _preview_ok := false
 var _preview_end := Vector3.ZERO
 
-func setup(w: WorldStore, cc: CameraController, h: Hud) -> void:
+func setup(w: WorldStore, cc: CameraController, h: Hud, main_host: Node = null) -> void:
 	world = w
 	camera_rig = cc
 	hud = h
+	host = main_host
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
 	_preview_root = Node3D.new()
@@ -44,6 +51,14 @@ func setup(w: WorldStore, cc: CameraController, h: Hud) -> void:
 	_preview_root.add_child(_fill_mi)
 	_start_marker = _make_marker(Config.COLOR_ACCENT)
 	_end_marker = _make_marker(Config.COLOR_PATH)
+
+func refresh_material_hud() -> void:
+	_update_hud()
+	if active and not drawing:
+		hud.set_status("画墙：连续点击端点（当前：%s，F1 参数 / F3 材质），实时显示长度" % Config.material_label(material_id))
+
+func _dialog_open() -> bool:
+	return host != null and host.has_method("is_any_dialog_open") and host.is_any_dialog_open()
 
 func _make_marker(color: Color) -> MeshInstance3D:
 	var mi := MeshInstance3D.new()
@@ -76,7 +91,7 @@ func set_active(a: bool) -> void:
 	if not a:
 		_cancel()
 	else:
-		hud.set_status("画墙：连续点击端点（磁吸角点/柱心），实时显示长度")
+		hud.set_status("画墙：连续点击端点（当前：%s，F1 参数 / F3 材质），实时显示长度" % Config.material_label(material_id))
 		_update_hud()
 
 func cancel() -> void:
@@ -94,6 +109,10 @@ func _cancel() -> void:
 
 func _physics_process(_delta: float) -> void:
 	if not active:
+		return
+	if _dialog_open():
+		_preview_root.visible = false
+		_end_marker.visible = false
 		return
 	if drawing:
 		_start_marker.position = Vector3(start_point.x, base_y + 0.11, start_point.z)
@@ -115,7 +134,7 @@ func _physics_process(_delta: float) -> void:
 ## → 柱心磁吸（端点落在柱侧面附近时吸到柱心，墙端嵌入柱内，不留缝）
 ## → 墙/地板角点磁吸
 ## → 墙中心线磁吸（T 型接头端点吸到目标墙中心线，墙端嵌入墙内，不留缝）
-## → 0.5m 网格。
+## → 否则使用原始瞄准点（无全局网格吸附）。
 func _snap_grid(p: Vector3) -> Vector3:
 	var s := world.snap_to_column_inset(p, thickness * 0.5, Config.SNAP_TO_CORNER)
 	if s != p:
@@ -129,8 +148,7 @@ func _snap_grid(p: Vector3) -> Vector3:
 	s = world.snap_to_wall(p, Config.SNAP_TO_WALL)
 	if s != p:
 		return s
-	var g := Config.GRID
-	return Vector3(roundf(p.x / g) * g, 0.0, roundf(p.z / g) * g)
+	return Vector3(p.x, 0.0, p.z)
 
 ## 画墙基准高度：起点落在柱子上时取柱底（即支撑面），
 ## 使墙能从柱子里拉出来，而不是悬在柱顶。
@@ -154,7 +172,7 @@ func _update_preview(end_point: Vector3) -> void:
 	var yaw := -atan2(between.z, between.x)
 	# 长度两端各外伸 EMBED、底部下沉 EMBED（顶面保持 base+WALL_HEIGHT 不变）：
 	# 墙端盖埋入柱体/相邻墙段、墙底埋入支撑面，所有相交面互相穿过而非共面。
-	var size := Vector3(length + Config.EMBED * 2.0, Config.WALL_HEIGHT + Config.EMBED, thickness)
+	var size := Vector3(length + Config.EMBED * 2.0, wall_height + Config.EMBED, thickness)
 	var center := Vector3(
 		(start_point.x + end_point.x) * 0.5,
 		base_y + size.y * 0.5 - Config.EMBED,
@@ -186,6 +204,8 @@ func _show_preview(center: Vector3, size: Vector3, yaw: float, ok: bool) -> void
 func _unhandled_input(event: InputEvent) -> void:
 	if not active:
 		return
+	if _dialog_open():
+		return
 	if get_viewport().gui_get_focus_owner() != null:
 		return
 	if event is InputEventKey and event.pressed:
@@ -202,7 +222,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			_on_left_click()
 			get_viewport().set_input_as_handled()
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
-			_cancel()
+			if drawing:
+				_cancel()
+				hud.set_status("已取消当前墙段")
+			else:
+				exit_requested.emit()
 			get_viewport().set_input_as_handled()
 
 func _on_left_click() -> void:
@@ -220,10 +244,20 @@ func _on_left_click() -> void:
 		return
 	if not _preview_ok or not _preview_root.visible:
 		return
-	world.place_box(_preview_center, _preview_size, Config.COLOR_WALL, "wall", _preview_yaw)
+	world.place_box(_preview_center, _preview_size, Config.material_color(material_id), "wall", _preview_yaw, 0, "", material_id)
 	start_point = _preview_end
 	_last_size = Vector3.ZERO
 	_preview_ok = false
 
 func _update_hud() -> void:
-	hud.set_tool_info("墙厚: %.2f m   [ / ] 调整" % thickness)
+	hud.set_tool_info("墙高: %.1f  墙厚: %.2f m   材质:%s   F1 参数 · [ / ] 厚 · F3 材质" % [
+		wall_height, thickness, Config.material_label(material_id),
+	])
+
+func get_placement_dims() -> Dictionary:
+	return {"height": wall_height, "thickness": thickness}
+
+func apply_placement_dims(dims: Dictionary) -> void:
+	wall_height = float(dims.get("height", wall_height))
+	thickness = clampf(float(dims.get("thickness", thickness)), Config.WALL_THICKNESS_MIN, Config.WALL_THICKNESS_MAX)
+	_update_hud()

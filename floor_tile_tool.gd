@@ -3,13 +3,19 @@ extends Node3D
 
 ## 地板工具：两段式点击。点击起点（点1）、移动鼠标预览、点击终点（点2），
 ## 铺设两点间的矩形地板（单块，任意尺寸，与画墙一致）。
-## 端点 0.5m 网格吸附，并磁吸柱子 / 墙体 / 其他地板的角点，便于对齐拼接。
+## 端点磁吸柱子 / 墙体 / 其他地板的角点，便于对齐拼接（无全局网格吸附）。
 ## 起点必须在地面、已有地板或墙柱表面；墙体/柱子不阻挡（地板从其下方铺过），
-## 地板与其他地板、设备互斥。绿=可放 / 红=与地板或设备重叠，右键取消或退出。
+## 地板与其他地板、设备互斥。绿=可放 / 红=与地板或设备重叠，右键取消笔画或退出工具。
+
+signal exit_requested
 
 var world: WorldStore
 var camera_rig: CameraController
 var hud: Hud
+
+var material_id := Config.DEFAULT_MATERIAL
+var floor_thickness := Config.FLOOR_THICKNESS
+var host: Node
 
 var active := false
 var valid := false
@@ -29,10 +35,11 @@ var _last_size := Vector3.ZERO
 var _start_marker: MeshInstance3D
 var _hover_marker: MeshInstance3D
 
-func setup(w: WorldStore, cc: CameraController, h: Hud) -> void:
+func setup(w: WorldStore, cc: CameraController, h: Hud, main_host: Node = null) -> void:
 	world = w
 	camera_rig = cc
 	hud = h
+	host = main_host
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
 	_preview_root = Node3D.new()
@@ -76,12 +83,17 @@ func set_active(a: bool) -> void:
 	active = a
 	_cancel_drawing()
 	_hover_marker.visible = false
-	if a:
-		hud.set_status("地板：点击起点、再点击终点铺设矩形（端点磁吸墙/柱/地板角点），右键取消")
-		_update_hud()
+	if not a:
+		return
+	hud.set_status("地板：点击起点、再点击终点铺设（当前：%s，F1 参数 / F3 材质），右键取消" % Config.material_label(material_id))
+	_update_hud()
 
 func _physics_process(_delta: float) -> void:
 	if not active:
+		return
+	if _dialog_open():
+		_hover_marker.visible = false
+		_preview_root.visible = false
 		return
 	# 点1 前的悬停标记：显示端点落点（含角点磁吸后的位置）
 	var p: Variant = _aim_point()
@@ -112,7 +124,7 @@ func _physics_process(_delta: float) -> void:
 func _mark_y() -> float:
 	return Config.FLOOR_TOP_OFFSET + 0.11
 
-## 由当前瞄准点计算端点：地面 / 地板 / 墙 / 柱表面 → 网格 + 角点吸附；其它 → null。
+## 由当前瞄准点计算端点：地面 / 地板 / 墙 / 柱表面 → 角点磁吸（无网格）；其它 → null。
 func _aim_point() -> Variant:
 	var aim := world.aim_surface(camera_rig)
 	if aim.is_empty():
@@ -131,8 +143,7 @@ func _snap_point(p: Vector3) -> Vector3:
 	var s := world.snap_to_corners(p, ["column", "wall", "floor_tile"], Config.SNAP_TO_CORNER)
 	if s != p:
 		return s
-	var g := Config.GRID
-	return Vector3(roundf(p.x / g) * g, 0.0, roundf(p.z / g) * g)
+	return Vector3(p.x, 0.0, p.z)
 
 ## 地板矩形：水平方向四周外扩 EMBED、底部下沉 EMBED（顶面标高不变）。
 ## 侧边埋入相邻地板/墙体、底面埋入地面，相交面互相穿过而非共面，消除闪烁。
@@ -148,7 +159,7 @@ func _rect() -> Dictionary:
 	max_x = ex[1]
 	min_z = ex[2]
 	max_z = ex[3]
-	var h := Config.FLOOR_THICKNESS + Config.EMBED
+	var h := floor_thickness + Config.EMBED
 	return {
 		"size": Vector3(max_x - min_x + Config.EMBED * 2.0, h, max_z - min_z + Config.EMBED * 2.0),
 		"center": Vector3((min_x + max_x) * 0.5,
@@ -287,8 +298,13 @@ func _build_wire(box_size: Vector3) -> ImmediateMesh:
 	im.surface_end()
 	return im
 
+func _dialog_open() -> bool:
+	return host != null and host.has_method("is_any_dialog_open") and host.is_any_dialog_open()
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not active:
+		return
+	if _dialog_open():
 		return
 	if get_viewport().gui_get_focus_owner() != null:
 		return
@@ -313,7 +329,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_cancel_drawing()
 			hud.set_status("已取消铺设")
 		else:
-			set_active(false)
+			exit_requested.emit()
 		get_viewport().set_input_as_handled()
 
 func _cancel_drawing() -> void:
@@ -331,10 +347,24 @@ func _place() -> void:
 		hud.set_status("区域无效（过小或与地板/设备重叠），未铺设")
 		return
 	var r: Dictionary = _place_rect
-	world.place_box(r["center"], r["size"], Config.COLOR_FLOOR, "floor_tile")
+	var color := Config.material_color(material_id)
+	world.place_box(r["center"], r["size"], color, "floor_tile", 0.0, 0, "", material_id)
 	var nom := _nominal_size(r["size"])
 	_cancel_drawing()
-	hud.set_status("已铺设地板 %.1f×%.1f m" % [nom.x, nom.z])
+	hud.set_status("已铺设%s地板 %.1f×%.1f m" % [Config.material_label(material_id), nom.x, nom.z])
 
 func _update_hud() -> void:
-	hud.set_tool_info("地板：两点矩形铺设，端点磁吸墙/柱/地板角点")
+	hud.set_tool_info("地板：两点矩形 · 厚 %.2f m · 材质 %s · F1 参数 / F3 材质" % [
+		floor_thickness, Config.material_label(material_id),
+	])
+
+func refresh_material_hud() -> void:
+	_update_hud()
+
+func get_placement_dims() -> Dictionary:
+	return {"thickness": floor_thickness}
+
+func apply_placement_dims(dims: Dictionary) -> void:
+	floor_thickness = maxf(0.1, float(dims.get("thickness", floor_thickness)))
+	_last_size = Vector3.ZERO
+	_update_hud()
