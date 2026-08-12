@@ -110,15 +110,18 @@ func _physics_process(_delta: float) -> void:
 	if drawing:
 		_update_preview(snapped)
 
-## 端点吸附顺序：角点磁吸（基于原始点，墙/柱/地板角点）→ 0.5m 网格 → 柱心磁吸。
+## 端点吸附顺序（均基于原始点，避免网格吸附掩盖目标）：
+## 柱角内缩磁吸（角点向柱心各轴内缩半墙厚，墙端完全嵌入柱内且与柱面齐平）
+## → 墙/地板角点磁吸 → 0.5m 网格。
 func _snap_grid(p: Vector3) -> Vector3:
-	var corner := world.snap_to_corners(p, ["column", "wall", "floor_tile"], Config.SNAP_TO_CORNER)
-	if corner != p:
-		return corner
+	var s := world.snap_to_column_inset(p, thickness * 0.5, Config.SNAP_TO_CORNER)
+	if s != p:
+		return s
+	s = world.snap_to_corners(p, ["wall", "floor_tile"], Config.SNAP_TO_CORNER)
+	if s != p:
+		return s
 	var g := Config.GRID
-	var s := Vector3(roundf(p.x / g) * g, 0.0, roundf(p.z / g) * g)
-	# 端点磁吸到附近柱心，使墙端嵌入柱内、消除接缝
-	return world.snap_to_kind(s, "column", Config.SNAP_TO_COLUMN)
+	return Vector3(roundf(p.x / g) * g, 0.0, roundf(p.z / g) * g)
 
 ## 画墙基准高度：起点落在柱子上时取柱底（即支撑面），
 ## 使墙能从柱子里拉出来，而不是悬在柱顶。

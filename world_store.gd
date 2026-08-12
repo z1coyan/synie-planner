@@ -158,6 +158,26 @@ func snap_to_kind(p: Vector3, kind: String, max_dist: float) -> Vector3:
 			best = Vector3(c.x, p.y, c.z)
 	return best
 
+## 磁吸：若 p（XZ 平面）距某柱子角点小于 max_dist，返回该角点向柱心方向
+## 各轴内缩 inset 后的位置——墙端（半厚 = inset）完全嵌入柱内且与柱面齐平；
+## 否则返回 p。
+func snap_to_column_inset(p: Vector3, inset: float, max_dist: float) -> Vector3:
+	var best := p
+	var best_d := max_dist
+	for obj in placed:
+		if not obj.has_meta("kind") or obj.get_meta("kind") != "column":
+			continue
+		var c: Vector3 = obj.global_position
+		for corner in obb_corners(obj):
+			var d := Vector2(p.x - corner.x, p.z - corner.z).length()
+			if d < best_d:
+				best_d = d
+				best = Vector3(
+					corner.x - signf(corner.x - c.x) * inset,
+					p.y,
+					corner.z - signf(corner.z - c.z) * inset)
+	return best
+
 ## 磁吸：若 p（XZ 平面）距某指定 kinds 物体的角点小于 max_dist，
 ## 返回最近的角点；否则返回 p。角点取物体底面矩形四角（考虑 yaw 旋转）。
 func snap_to_corners(p: Vector3, kinds: Array, max_dist: float) -> Vector3:
