@@ -1,7 +1,7 @@
 class_name StairTool
 extends Node3D
 
-## 楼梯工具：单击落点放置（底面中心为起点），朝向跟随相机 yaw。
+## 楼梯工具：单击落点放置（底面中心为起点），朝向吸附世界 XZ 四向正交（无自由 yaw）。
 ## 右键退出到「无」。F1 宽/长/高，F3 材质。局部网格与柱/墙/地板一致。
 
 signal exit_requested
@@ -55,7 +55,7 @@ func set_active(a: bool) -> void:
 	if not a:
 		_preview_root.visible = false
 		return
-	hud.set_status("楼梯：单击地面放置（朝向跟随视角，当前：%s，F1 参数 / F3 材质），右键取消" % Config.material_label(material_id))
+	hud.set_status("楼梯：单击地面放置（朝向正交就近轴向，当前：%s，F1 参数 / F3 材质），右键取消" % Config.material_label(material_id))
 	_update_hud()
 
 func refresh_material_hud() -> void:
@@ -63,6 +63,15 @@ func refresh_material_hud() -> void:
 
 func _dialog_open() -> bool:
 	return host != null and host.has_method("is_any_dialog_open") and host.is_any_dialog_open()
+
+## 相机水平朝向吸附到最近世界轴。踏步沿局部 -Z 上行：
+## 0 → -Z，π/2 → -X，π → +Z，-π/2 → +X。不使用任意角度。
+func _orthogonal_yaw(look_yaw: float) -> float:
+	var fx := -sin(look_yaw)
+	var fz := -cos(look_yaw)
+	if absf(fx) >= absf(fz):
+		return -PI * 0.5 if fx >= 0.0 else PI * 0.5
+	return PI if fz >= 0.0 else 0.0
 
 func _physics_process(_delta: float) -> void:
 	if not active:
@@ -76,7 +85,7 @@ func _physics_process(_delta: float) -> void:
 		_preview_root.visible = false
 		valid = false
 		return
-	var yaw := camera_rig.yaw
+	var yaw := _orthogonal_yaw(camera_rig.yaw)
 	var point: Vector3 = aim["point"]
 	var xz := Vector3(point.x, 0.0, point.z)
 	xz = world.snap_to_corners(xz, ["column", "wall", "floor_tile"], Config.SNAP_TO_CORNER)
@@ -143,7 +152,7 @@ func _update_hud() -> void:
 	hud.set_tool_info("楼梯  宽:%.2f  长:%.2f  高:%.2f  材质:%s" % [
 		stair_width, stair_length, stair_height, Config.material_label(material_id),
 	])
-	hud.set_status("放置：楼梯（单击落点，朝向跟随视角，F1 参数 / F3 材质）")
+	hud.set_status("放置：楼梯（单击落点，朝向正交就近轴向，F1 参数 / F3 材质）")
 
 func get_placement_dims() -> Dictionary:
 	return {"width": stair_width, "length": stair_length, "height": stair_height}

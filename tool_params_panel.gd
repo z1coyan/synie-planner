@@ -1,7 +1,7 @@
 class_name ToolParamsPanel
 extends CanvasLayer
 
-## 工具参数对话框：按种类编辑基本尺寸（柱高/粗细、墙高/厚、地板厚、楼梯宽/长/高）。
+## 工具参数对话框：按种类编辑基本尺寸（柱/墙/地板/楼梯/门洞/窗洞）。
 
 signal confirmed
 signal cancelled
@@ -24,6 +24,8 @@ var _height_row_label: Label
 var _thickness_row_label: Label
 var _width_row_label: Label
 var _length_row_label: Label
+var _sill_spin: SpinBox
+var _sill_row_label: Label
 
 func setup(cc: CameraController) -> void:
 	camera_rig = cc
@@ -86,6 +88,8 @@ func setup(cc: CameraController) -> void:
 	_height_spin = _mk_float_spin(0.5, 50.0, 0.1, 5.0)
 	_thickness_row_label = _mk_label("厚度")
 	_thickness_spin = _mk_float_spin(0.1, 10.0, 0.05, 0.4)
+	_sill_row_label = _mk_label("窗台高度")
+	_sill_spin = _mk_float_spin(0.0, 10.0, 0.05, 0.9)
 	_form.add_child(_width_row_label)
 	_form.add_child(_width_spin)
 	_form.add_child(_length_row_label)
@@ -94,6 +98,8 @@ func setup(cc: CameraController) -> void:
 	_form.add_child(_height_spin)
 	_form.add_child(_thickness_row_label)
 	_form.add_child(_thickness_spin)
+	_form.add_child(_sill_row_label)
+	_form.add_child(_sill_spin)
 
 	var hint := Label.new()
 	hint.text = "确认后立即生效"
@@ -172,6 +178,8 @@ func show_dialog(kind: String, values: Dictionary) -> void:
 			_thickness_spin.step = 0.05
 			_height_spin.value = float(values.get("height", Config.COLUMN_HEIGHT))
 			_thickness_spin.value = float(values.get("thickness", Config.COLUMN_SIZES[0]))
+			_sill_row_label.visible = false
+			_sill_spin.visible = false
 		"wall":
 			_title.text = "墙体参数"
 			_width_row_label.visible = false
@@ -192,6 +200,8 @@ func show_dialog(kind: String, values: Dictionary) -> void:
 			_thickness_spin.step = Config.WALL_THICKNESS_STEP
 			_height_spin.value = float(values.get("height", Config.WALL_HEIGHT))
 			_thickness_spin.value = float(values.get("thickness", Config.WALL_THICKNESS_DEFAULT))
+			_sill_row_label.visible = false
+			_sill_spin.visible = false
 		"floor_tile":
 			_title.text = "地板参数"
 			_width_row_label.visible = false
@@ -207,8 +217,11 @@ func show_dialog(kind: String, values: Dictionary) -> void:
 			_thickness_spin.max_value = 2.0
 			_thickness_spin.step = 0.05
 			_thickness_spin.value = float(values.get("thickness", Config.FLOOR_THICKNESS))
+			_sill_row_label.visible = false
+			_sill_spin.visible = false
 		"stair":
 			_title.text = "楼梯参数"
+			_width_row_label.text = "横向宽度"
 			_width_row_label.visible = true
 			_width_spin.visible = true
 			_length_row_label.visible = true
@@ -217,6 +230,8 @@ func show_dialog(kind: String, values: Dictionary) -> void:
 			_height_spin.visible = true
 			_thickness_row_label.visible = false
 			_thickness_spin.visible = false
+			_sill_row_label.visible = false
+			_sill_spin.visible = false
 			_width_spin.min_value = 0.4
 			_width_spin.max_value = 20.0
 			_width_spin.step = 0.05
@@ -229,6 +244,77 @@ func show_dialog(kind: String, values: Dictionary) -> void:
 			_width_spin.value = float(values.get("width", Config.STAIR_WIDTH))
 			_length_spin.value = float(values.get("length", Config.STAIR_LENGTH))
 			_height_spin.value = float(values.get("height", Config.STAIR_HEIGHT))
+		"door":
+			_title.text = "门洞参数"
+			_width_row_label.text = "宽度"
+			_width_row_label.visible = true
+			_width_spin.visible = true
+			_length_row_label.visible = false
+			_length_spin.visible = false
+			_height_row_label.text = "高度"
+			_height_row_label.visible = true
+			_height_spin.visible = true
+			_thickness_row_label.visible = false
+			_thickness_spin.visible = false
+			_sill_row_label.visible = false
+			_sill_spin.visible = false
+			_width_spin.min_value = Config.OPENING_MIN
+			_width_spin.max_value = 20.0
+			_width_spin.step = 0.05
+			_height_spin.min_value = Config.OPENING_MIN
+			_height_spin.max_value = 20.0
+			_height_spin.step = 0.05
+			_width_spin.value = float(values.get("width", Config.DOOR_WIDTH))
+			_height_spin.value = float(values.get("height", Config.DOOR_HEIGHT))
+		"floor_hole":
+			_title.text = "地洞参数"
+			_width_row_label.text = "横向宽度"
+			_width_row_label.visible = true
+			_width_spin.visible = true
+			_length_row_label.text = "纵向长度"
+			_length_row_label.visible = true
+			_length_spin.visible = true
+			_height_row_label.visible = false
+			_height_spin.visible = false
+			_thickness_row_label.visible = false
+			_thickness_spin.visible = false
+			_sill_row_label.visible = false
+			_sill_spin.visible = false
+			_width_spin.min_value = Config.OPENING_MIN
+			_width_spin.max_value = 40.0
+			_width_spin.step = 0.05
+			_length_spin.min_value = Config.OPENING_MIN
+			_length_spin.max_value = 40.0
+			_length_spin.step = 0.05
+			_width_spin.value = float(values.get("width", Config.FLOOR_HOLE_WIDTH))
+			_length_spin.value = float(values.get("length", Config.FLOOR_HOLE_LENGTH))
+		"window":
+			_title.text = "窗洞参数"
+			_width_row_label.text = "宽度"
+			_width_row_label.visible = true
+			_width_spin.visible = true
+			_length_row_label.visible = false
+			_length_spin.visible = false
+			_height_row_label.text = "高度"
+			_height_row_label.visible = true
+			_height_spin.visible = true
+			_thickness_row_label.visible = false
+			_thickness_spin.visible = false
+			_sill_row_label.text = "窗台高度"
+			_sill_row_label.visible = true
+			_sill_spin.visible = true
+			_width_spin.min_value = Config.OPENING_MIN
+			_width_spin.max_value = 20.0
+			_width_spin.step = 0.05
+			_height_spin.min_value = Config.OPENING_MIN
+			_height_spin.max_value = 20.0
+			_height_spin.step = 0.05
+			_sill_spin.min_value = 0.0
+			_sill_spin.max_value = 10.0
+			_sill_spin.step = 0.05
+			_width_spin.value = float(values.get("width", Config.WINDOW_WIDTH))
+			_height_spin.value = float(values.get("height", Config.WINDOW_HEIGHT))
+			_sill_spin.value = float(values.get("sill", Config.WINDOW_SILL))
 		_:
 			cancelled.emit()
 			return
@@ -268,6 +354,23 @@ func _on_confirm() -> void:
 				"width": float(_width_spin.value),
 				"length": float(_length_spin.value),
 				"height": float(_height_spin.value),
+			}
+		"door":
+			_values = {
+				"width": float(_width_spin.value),
+				"height": float(_height_spin.value),
+				"sill": 0.0,
+			}
+		"floor_hole":
+			_values = {
+				"width": float(_width_spin.value),
+				"length": float(_length_spin.value),
+			}
+		"window":
+			_values = {
+				"width": float(_width_spin.value),
+				"height": float(_height_spin.value),
+				"sill": float(_sill_spin.value),
 			}
 	confirmed.emit()
 

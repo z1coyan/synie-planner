@@ -64,6 +64,7 @@ var _array_material := ""
 var _array_width := 0.0
 var _array_length := 0.0
 var _array_height := 0.0
+var _array_openings: Array = []
 
 func setup(w: WorldStore, cc: CameraController, h: Hud, hb: Hotbar, main_host: Node = null) -> void:
 	world = w
@@ -236,8 +237,27 @@ func _clear_selected_highlight_only() -> void:
 
 func _apply_highlight(body: StaticBody3D, pad: float, emission: float, out: Array) -> void:
 	# AABB 12 棱描边（非倒挤外壳）：底 4 棱抬到地面之上，薄板/埋地柱墙也能看见一圈底边。
+	# 墙体（含门窗洞）始终包络整面墙，不按剩余碎块画多圈。
 	var edge := HL_EDGE_SELECTED if pad >= HL_PAD_SELECTED - 0.001 else HL_EDGE_HOVER
 	var mat := _make_outline_mat(emission)
+	if body.has_meta("kind") and String(body.get_meta("kind")) == "wall" and body.has_meta("size"):
+		var size: Vector3 = body.get_meta("size")
+		var yaw: float = float(body.get_meta("yaw")) if body.has_meta("yaw") else 0.0
+		var root := Node3D.new()
+		root.name = HL_NAME
+		root.rotation.y = yaw
+		for spec in _outline_edge_specs(size, pad, edge):
+			var mi := MeshInstance3D.new()
+			var bm := BoxMesh.new()
+			bm.size = spec[1]
+			mi.mesh = bm
+			mi.position = spec[0]
+			mi.material_override = mat
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			root.add_child(mi)
+		body.add_child(root)
+		out.append(root)
+		return
 	for child in body.get_children():
 		if String(child.name) == HL_NAME:
 			continue
@@ -412,7 +432,7 @@ func _ignore_kinds(kind: String) -> Array:
 		"wall":
 			return ["wall", "column", "floor_tile"]
 		"floor_tile":
-			return ["wall", "column"]
+			return ["wall", "column", "floor_tile"]
 		"stair":
 			return ["wall", "column", "floor_tile"]
 		_:
@@ -578,6 +598,11 @@ func _process_array() -> void:
 	_array_width = float(_selected.get_meta("width")) if _selected.has_meta("width") else size.x
 	_array_length = float(_selected.get_meta("length")) if _selected.has_meta("length") else size.z
 	_array_height = float(_selected.get_meta("height")) if _selected.has_meta("height") else size.y
+	_array_openings = []
+	if _selected.has_meta("openings") and _selected.get_meta("openings") is Array:
+		for op_v in _selected.get_meta("openings"):
+			if typeof(op_v) == TYPE_DICTIONARY:
+				_array_openings.append((op_v as Dictionary).duplicate())
 	var gi := 0
 	for j in _array_count_v:
 		for i in _array_count_u:
@@ -603,6 +628,17 @@ func _confirm_array() -> void:
 	if _array_centers.is_empty():
 		return
 	var placed_n := 0
+	var src_origin := _selected.global_position if is_instance_valid(_selected) else Vector3.ZERO
+	var src_pieces: Array = []
+	var src_floor_ops: Array = []
+	if _array_kind == "floor_tile" and is_instance_valid(_selected) and _selected.has_meta("pieces"):
+		for p_v in _selected.get_meta("pieces"):
+			if typeof(p_v) == TYPE_DICTIONARY:
+				src_pieces.append((p_v as Dictionary).duplicate())
+	if _array_kind == "floor_tile" and is_instance_valid(_selected) and _selected.has_meta("openings"):
+		for op_v in _selected.get_meta("openings"):
+			if typeof(op_v) == TYPE_DICTIONARY:
+				src_floor_ops.append((op_v as Dictionary).duplicate())
 	for i in _array_centers.size():
 		if not _array_valids[i]:
 			continue
@@ -611,9 +647,34 @@ func _confirm_array() -> void:
 				_array_centers[i], _array_width, _array_length, _array_height,
 				_array_yaw, _array_material)
 		else:
-			world.place_box(
+			var extra_pieces: Array = []
+			var extra_openings: Array = []
+			if _array_kind == "floor_tile" and not src_pieces.is_empty():
+				var copy_center: Vector3 = _array_centers[i]
+				var dx: float = copy_center.x - src_origin.x
+				var dz: float = copy_center.z - src_origin.z
+				for p in src_pieces:
+					extra_pieces.append({
+						"x0": float(p["x0"]) + dx,
+						"x1": float(p["x1"]) + dx,
+						"z0": float(p["z0"]) + dz,
+						"z1": float(p["z1"]) + dz,
+					})
+				for op_v2 in src_floor_ops:
+					if typeof(op_v2) != TYPE_DICTIONARY:
+						continue
+					var op2: Dictionary = op_v2
+					extra_openings.append({
+						"x0": float(op2.get("x0", 0.0)) + dx,
+						"x1": float(op2.get("x1", 0.0)) + dx,
+						"z0": float(op2.get("z0", 0.0)) + dz,
+						"z1": float(op2.get("z1", 0.0)) + dz,
+					})
+			var placed_body := world.place_box(
 				_array_centers[i], _array_size, _array_color, _array_kind,
-				_array_yaw, _array_floor, _array_name, _array_material)
+				_array_yaw, _array_floor, _array_name, _array_material, extra_pieces, extra_openings)
+			if _array_kind == "wall" and not _array_openings.is_empty():
+				world.set_wall_openings(placed_body, _array_openings)
 		placed_n += 1
 	_hide_array_panel()
 	_clear_array_ghosts()
@@ -628,6 +689,8 @@ func _confirm_array() -> void:
 			_show_tool_bar()
 		else:
 			_show_device_action_bar()
+		_clear_selected_highlight_only()
+		_apply_highlight(_selected, HL_PAD_SELECTED, HL_EMISSION_SELECTED, _selected_mis)
 	else:
 		mode = "hover"
 		_show_tool_bar()

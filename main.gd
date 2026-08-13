@@ -7,6 +7,9 @@ var builder: Builder
 var wall_tool: WallTool
 var floor_tile_tool: FloorTileTool
 var stair_tool: StairTool
+var door_tool: OpeningTool
+var window_tool: OpeningTool
+var floor_opening_tool: FloorOpeningTool
 var hud: Hud
 var menu: PauseMenu
 var ground_grid: GroundGrid
@@ -111,6 +114,24 @@ func _ready() -> void:
 	stair_tool.setup(world, camera_rig, hud, self)
 	stair_tool.exit_requested.connect(_on_tool_exit)
 
+	door_tool = OpeningTool.new()
+	door_tool.name = "DoorTool"
+	add_child(door_tool)
+	door_tool.setup(world, camera_rig, hud, self, "door")
+	door_tool.exit_requested.connect(_on_tool_exit)
+
+	window_tool = OpeningTool.new()
+	window_tool.name = "WindowTool"
+	add_child(window_tool)
+	window_tool.setup(world, camera_rig, hud, self, "window")
+	window_tool.exit_requested.connect(_on_tool_exit)
+
+	floor_opening_tool = FloorOpeningTool.new()
+	floor_opening_tool.name = "FloorOpeningTool"
+	add_child(floor_opening_tool)
+	floor_opening_tool.setup(world, camera_rig, hud, self)
+	floor_opening_tool.exit_requested.connect(_on_tool_exit)
+
 	delete_tool = DeleteTool.new()
 	delete_tool.name = "DeleteTool"
 	add_child(delete_tool)
@@ -166,6 +187,12 @@ func sync_param_bar() -> void:
 		param_bar.show_context("placement", "floor_tile", floor_tile_tool.material_id, false)
 	elif current_tool == "stair":
 		param_bar.show_context("placement", "stair", stair_tool.material_id, false)
+	elif current_tool == "door":
+		param_bar.show_context("placement", "door", "", false)
+	elif current_tool == "window":
+		param_bar.show_context("placement", "window", "", false)
+	elif current_tool == "floor_hole":
+		param_bar.show_context("placement", "floor_hole", "", false)
 	elif current_tool == "none" and select_tool != null and select_tool.wants_param_bar():
 		select_tool.sync_param_bar(param_bar)
 	else:
@@ -200,6 +227,12 @@ func _open_tool_params() -> void:
 				dims = floor_tile_tool.get_placement_dims()
 			"stair":
 				dims = stair_tool.get_placement_dims()
+			"door":
+				dims = door_tool.get_placement_dims()
+			"window":
+				dims = window_tool.get_placement_dims()
+			"floor_hole":
+				dims = floor_opening_tool.get_placement_dims()
 	elif ctx == "selection":
 		dims = select_tool.get_selected_logical_dims()
 	else:
@@ -226,6 +259,12 @@ func _on_tool_params_confirmed() -> void:
 				floor_tile_tool.apply_placement_dims(dims)
 			"stair":
 				stair_tool.apply_placement_dims(dims)
+			"door":
+				door_tool.apply_placement_dims(dims)
+			"window":
+				window_tool.apply_placement_dims(dims)
+			"floor_hole":
+				floor_opening_tool.apply_placement_dims(dims)
 		hud.set_status("已更新放置参数（F1 可再改）")
 	elif ctx == "selection":
 		select_tool.apply_selected_dims(dims)
@@ -246,6 +285,12 @@ func _on_tool_params_cancelled() -> void:
 		floor_tile_tool.refresh_material_hud()
 	elif current_tool == "stair":
 		stair_tool.refresh_material_hud()
+	elif current_tool == "door":
+		door_tool.refresh_hud()
+	elif current_tool == "window":
+		window_tool.refresh_hud()
+	elif current_tool == "floor_hole":
+		floor_opening_tool.refresh_hud()
 
 func _on_material_confirmed() -> void:
 	if material_panel == null:
@@ -405,6 +450,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_5:
 				_set_tool("stair")
 				get_viewport().set_input_as_handled()
+			KEY_6:
+				_set_tool("door")
+				get_viewport().set_input_as_handled()
+			KEY_7:
+				_set_tool("window")
+				get_viewport().set_input_as_handled()
+			KEY_8:
+				_set_tool("floor_hole")
+				get_viewport().set_input_as_handled()
 			KEY_X:
 				_set_tool("delete")
 				get_viewport().set_input_as_handled()
@@ -426,6 +480,9 @@ func _set_tool(t: String) -> void:
 	wall_tool.set_active(t == "wall")
 	floor_tile_tool.set_active(t == "floor_tile")
 	stair_tool.set_active(t == "stair")
+	door_tool.set_active(t == "door")
+	window_tool.set_active(t == "window")
+	floor_opening_tool.set_active(t == "floor_hole")
 	delete_tool.set_active(t == "delete")
 	select_tool.set_active(t == "none")
 	builder.set_tool("column" if t == "column" else "device" if t == "device" else "none")
@@ -435,7 +492,7 @@ func _set_tool(t: String) -> void:
 		ground_grid.set_patch_visible(false)
 
 func _is_placement_tool(t: String) -> bool:
-	return t == "column" or t == "wall" or t == "floor_tile" or t == "stair" or t == "device"
+	return t == "column" or t == "wall" or t == "floor_tile" or t == "stair" or t == "device" or t == "door" or t == "window" or t == "floor_hole"
 
 ## 放置工具激活且有有效瞄准时，把局部网格贴在物体脚点下；否则立刻隐藏。
 func _physics_process(_delta: float) -> void:
@@ -462,6 +519,15 @@ func _sync_placement_grid() -> void:
 		"stair":
 			origin = stair_tool.get_grid_origin()
 			extent = stair_tool.get_grid_extent()
+		"door":
+			origin = door_tool.get_grid_origin()
+			extent = door_tool.get_grid_extent()
+		"window":
+			origin = window_tool.get_grid_origin()
+			extent = window_tool.get_grid_extent()
+		"floor_hole":
+			origin = floor_opening_tool.get_grid_origin()
+			extent = floor_opening_tool.get_grid_extent()
 	if origin == null:
 		ground_grid.set_patch_visible(false)
 		return

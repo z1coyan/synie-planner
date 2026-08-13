@@ -2,6 +2,7 @@ class_name DeleteTool
 extends Node3D
 
 ## 拆除工具：X 键进入。左键点选墙体/柱子/设备/地板立即删除；
+## 瞄准门窗洞/地洞时只删该洞，删除墙体或地板时其洞口一并消失。
 ## 在空白处按住左键拖拽出矩形框，松开批量删除框内物体（框选过程实时橙色高亮 + 计数）。
 ## 右键 / X / 0 退出工具。不可见（无碰撞层）的物体不参与点选与框选。
 
@@ -18,6 +19,9 @@ var active := false
 
 var _hover: StaticBody3D
 var _hover_mis: Array = []
+var _hover_opening_index := -1
+var _hover_opening: Dictionary = {}
+var _opening_hl: MeshInstance3D
 var _hl_mat: StandardMaterial3D
 
 var _dragging := false
@@ -44,6 +48,10 @@ func setup(w: WorldStore, cc: CameraController, h: Hud) -> void:
 	_marquee.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_marquee.visible = false
 	_marquee_layer.add_child(_marquee)
+	_opening_hl = MeshInstance3D.new()
+	_opening_hl.name = "OpeningDeleteHL"
+	_opening_hl.visible = false
+	add_child(_opening_hl)
 
 func set_active(a: bool) -> void:
 	active = a
@@ -62,6 +70,10 @@ func _clear_hover() -> void:
 			mi.material_override = null
 	_hover_mis.clear()
 	_hover = null
+	_hover_opening_index = -1
+	_hover_opening = {}
+	if _opening_hl != null:
+		_opening_hl.visible = false
 
 func _cancel_drag() -> void:
 	_dragging = false
@@ -81,17 +93,40 @@ func _physics_process(_delta: float) -> void:
 		_update_marquee()
 		return
 	var aim := world.aim_surface(camera_rig)
+	var op_hit := world.aim_opening(camera_rig)
 	var target: StaticBody3D = null
+	var opening_index := -1
+	var opening_rec: Dictionary = {}
+	var solid_d := INF
+	var op_d := INF
+	var origin := Vector3.ZERO
+	if not aim.is_empty() and aim.has("origin"):
+		origin = aim["origin"]
+	else:
+		origin = world.camera_ray(camera_rig)["origin"]
 	if not aim.is_empty():
 		var body: Object = aim.get("body")
 		if body != null and body is StaticBody3D and body.has_meta("kind") \
 				and DELETABLE_KINDS.has(body.get_meta("kind")) and body.collision_layer != 0:
 			target = body
-	if target != _hover:
+			solid_d = (aim["point"] as Vector3).distance_to(origin)
+	if not op_hit.is_empty():
+		op_d = (op_hit["point"] as Vector3).distance_to(origin)
+		if op_d < solid_d - 0.01:
+			target = op_hit["body"]
+			opening_index = int(op_hit["index"])
+			opening_rec = op_hit.get("opening", {})
+	var same := target == _hover and opening_index == _hover_opening_index
+	if not same:
 		_clear_hover()
 		_hover = target
+		_hover_opening_index = opening_index
+		_hover_opening = opening_rec
 		if _hover != null:
-			_apply_highlight(_hover, _hover_mis)
+			if opening_index >= 0:
+				_show_opening_highlight(_hover, opening_rec)
+			else:
+				_apply_highlight(_hover, _hover_mis)
 	_update_hud()
 
 func _apply_highlight(body: StaticBody3D, out: Array) -> void:
@@ -100,10 +135,39 @@ func _apply_highlight(body: StaticBody3D, out: Array) -> void:
 			child.material_override = _hl_mat
 			out.append(child)
 
+func _show_opening_highlight(wall: StaticBody3D, op: Dictionary) -> void:
+	if _opening_hl == null or op.is_empty():
+		return
+	var box := world.opening_world_box(wall, op)
+	var bm := BoxMesh.new()
+	bm.size = box["size"]
+	_opening_hl.mesh = bm
+	_opening_hl.material_override = _hl_mat
+	_opening_hl.position = box["center"]
+	_opening_hl.rotation.y = float(box["yaw"])
+	_opening_hl.visible = true
+
 func _update_hud() -> void:
 	if _hover == null:
 		hud.set_tool_info("")
 		hud.set_length("")
+		return
+	if _hover_opening_index >= 0:
+		var typ := String(_hover_opening.get("type", "door"))
+		var hole_name := "门洞"
+		if typ == "window":
+			hole_name = "窗洞"
+		elif typ == "floor_hole":
+			hole_name = "地洞"
+		var hole_b := float(_hover_opening.get("height", 0.0))
+		if typ == "floor_hole":
+			hole_b = float(_hover_opening.get("length", 0.0))
+		hud.set_tool_info("目标: %s  %.2f×%.2f m" % [
+			hole_name,
+			float(_hover_opening.get("width", 0.0)),
+			hole_b,
+		])
+		hud.set_length("左键删除该洞口")
 		return
 	var size: Vector3 = _hover.get_meta("size")
 	var kind_name: String = KIND_NAMES.get(_hover.get_meta("kind"), "物体")
@@ -161,7 +225,24 @@ func _finish_drag() -> void:
 
 func _delete_hover() -> void:
 	var body := _hover
+	var opening_index := _hover_opening_index
+	var opening_rec := _hover_opening.duplicate()
 	_clear_hover()
+	if opening_index >= 0 and is_instance_valid(body):
+		var typ := String(opening_rec.get("type", "door"))
+		var hole_name := "门洞"
+		if typ == "window":
+			hole_name = "窗洞"
+		elif typ == "floor_hole":
+			hole_name = "地洞"
+		if typ == "floor_hole":
+			world.remove_floor_opening(body, opening_index)
+		else:
+			world.remove_wall_opening(body, opening_index)
+		hud.set_status("已删除：%s" % hole_name)
+		hud.set_tool_info("")
+		hud.set_length("")
+		return
 	var kind_name: String = KIND_NAMES.get(body.get_meta("kind"), "物体")
 	if body.has_meta("name"):
 		kind_name += "（%s）" % body.get_meta("name")

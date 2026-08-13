@@ -1,8 +1,8 @@
 class_name Hotbar
 extends CanvasLayer
 
-## 双层快捷栏——底层工具 1-5/X 常驻；设备选中时上层浮出 F2 阵列。
-## 柱/墙/地板/楼梯的 F1/F2/F3 由 ParamBar 负责。
+## 双层快捷栏——底层工具 1-8/X 常驻；设备选中时上层浮出 F2 阵列。
+## 柱/墙/地板/楼梯/门洞/窗洞的 F1/F3 由 ParamBar 负责。
 
 signal action_chosen(action_id: String)
 
@@ -12,6 +12,9 @@ const SLOT_DEFS := [
 	{"key": "3", "name": "墙体", "icon": "wall"},
 	{"key": "4", "name": "地板", "icon": "floor_tile"},
 	{"key": "5", "name": "楼梯", "icon": "stair"},
+	{"key": "6", "name": "门洞", "icon": "door"},
+	{"key": "7", "name": "窗洞", "icon": "window"},
+	{"key": "8", "name": "地洞", "icon": "floor_hole"},
 	{"key": "X", "name": "删除", "icon": "delete"},
 ]
 
@@ -132,7 +135,7 @@ func _on_action_slot_input(event: InputEvent, action_id: String) -> void:
 		action_chosen.emit(action_id)
 		get_viewport().set_input_as_handled()
 
-## tool: "none" | "wall" | "column" | "device" | "floor_tile" | "stair" | "delete"
+## tool: "none" | "wall" | "column" | "device" | "floor_tile" | "stair" | "door" | "window" | "floor_hole" | "delete"
 func set_state(tool: String) -> void:
 	_tool_state = tool
 	for i in _slots.size():
@@ -149,6 +152,12 @@ func set_state(tool: String) -> void:
 			4:
 				active = tool == "stair"
 			5:
+				active = tool == "door"
+			6:
+				active = tool == "window"
+			7:
+				active = tool == "floor_hole"
+			8:
 				active = tool == "delete"
 		(_slots[i] as PanelContainer).add_theme_stylebox_override(
 			"panel", UiTheme.slot_style(active, false))

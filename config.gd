@@ -26,6 +26,21 @@ const WALL_THICKNESS_MAX := 1.0
 const WALL_THICKNESS_STEP := 0.05
 const WALL_HEIGHT := 5.0
 
+## 门洞 / 窗洞默认（米）。门洞贴地；窗洞窗台距地。
+const DOOR_WIDTH := 0.9
+const DOOR_HEIGHT := 2.1
+const DOOR_SILL := 0.0
+const WINDOW_WIDTH := 1.2
+const WINDOW_HEIGHT := 1.2
+const WINDOW_SILL := 0.9
+const OPENING_MIN := 0.3
+const FLOOR_HOLE_WIDTH := 1.0
+const FLOOR_HOLE_LENGTH := 1.0
+
+## 窗洞玻璃：薄片填在开洞矩形内（无碰撞），半透明冷青。
+const WINDOW_GLASS_THICKNESS := 0.03
+const COLOR_WINDOW_GLASS := Color(0.62, 0.84, 0.88, 0.28)
+
 const COLUMN_WIDTH := 0.4
 const COLUMN_DEPTH := 0.4
 const COLUMN_HEIGHT := 5.0

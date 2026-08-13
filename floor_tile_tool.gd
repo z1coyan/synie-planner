@@ -3,9 +3,10 @@ extends Node3D
 
 ## 地板工具：两段式点击。点击起点（点1）、移动鼠标预览、点击终点（点2），
 ## 铺设两点间的矩形地板（单块，任意尺寸，与画墙一致）。
-## 端点磁吸柱子 / 墙体 / 其他地板 / 楼梯顶踏四角，便于对齐拼接（无全局网格吸附）。
+## 端点磁吸柱子 / 墙体顶面四角 / 其他地板 / 楼梯顶踏四角，便于对齐拼接（无全局网格吸附）。
+## 吸到墙顶角时地板顶面与墙顶齐平，该角即为地板矩形顶点（含墙厚，非墙中心线）。
 ## 起点必须在地面、已有地板或墙柱表面；墙体/柱子不阻挡（地板从其下方铺过），
-## 地板与其他地板、设备互斥。绿=可放 / 红=与地板或设备重叠，右键取消笔画或退出工具。
+## 不与其他地板做碰撞检测；重叠或共边且同标高的地板合并为一块。绿=可放 / 红=与设备重叠，右键取消笔画或退出工具。
 
 signal exit_requested
 
@@ -106,7 +107,7 @@ func _physics_process(_delta: float) -> void:
 			hud.set_length("仅可放在地面或地板边缘")
 			return
 	else:
-		_hover_marker.position = Vector3(p.x, _mark_y(), p.z)
+		_hover_marker.position = Vector3(p.x, _mark_y(p), p.z)
 		_hover_marker.visible = true
 	if not _drawing:
 		_preview_root.visible = false
@@ -115,16 +116,18 @@ func _physics_process(_delta: float) -> void:
 			hud.set_length("点击确定起点")
 		return
 	# 已确定起点：更新终点与矩形预览
-	_start_marker.position = Vector3(_start.x, _mark_y(), _start.z)
+	_start_marker.position = Vector3(_start.x, _mark_y(_start), _start.z)
 	_start_marker.visible = true
 	if p != null:
 		_end = p
 	_update_rect_preview()
 
-## 标记悬浮高度：略高于地面标高，避免与地板面穿插。
-func _mark_y() -> float:
+## 标记悬浮高度：略高于当前铺设标高（地面或墙顶/梯顶），避免与地板面穿插。
+func _mark_y(p: Vector3 = Vector3.ZERO) -> float:
 	if _drawing:
 		return _base_y + 0.11
+	if p.y > Config.FLOOR_TOP_OFFSET + 0.05:
+		return p.y + 0.11
 	return Config.FLOOR_TOP_OFFSET + 0.11
 
 ## 由当前瞄准点计算端点：地面 / 地板 / 墙 / 柱表面 → 角点磁吸（无网格）；其它 → null。
@@ -140,13 +143,44 @@ func _aim_point() -> Variant:
 		return _snap_point(aim["point"])
 	return null
 
-## 先在原始点附近磁吸柱子 / 墙体 / 地板的角点；找不到再退回 0.5m 网格吸附。
-## （顺序不能反：先网格吸附会偏移最多 0.35m，导致不在网格上的角点超出阈值。）
+## 先在原始点附近磁吸柱子 / 墙顶四角 / 地板 / 楼梯顶四角；找不到则用原始 XZ。
+## 墙/楼梯角点保留顶面世界 Y，供铺板对齐墙顶标高。
 func _snap_point(p: Vector3) -> Vector3:
-	var s := world.snap_to_corners(p, ["column", "wall", "floor_tile", "stair"], Config.SNAP_TO_CORNER)
-	if s != p:
-		return s
-	return Vector3(p.x, 0.0, p.z)
+	var hit := world.pick_snap_corner(p, ["column", "wall", "floor_tile", "stair"], Config.SNAP_TO_CORNER)
+	if hit.is_empty():
+		return Vector3(p.x, 0.0, p.z)
+	var kind := String(hit["kind"])
+	var c: Vector3 = hit["point"]
+	if kind == "stair":
+		return c
+	if kind == "wall":
+		# 瞄到墙顶附近才带上墙顶 Y；地面铺板只吸 XZ，避免墙角把一层地板抬到墙顶。
+		if p.y >= c.y - 1.0:
+			return c
+		return Vector3(c.x, 0.0, c.z)
+	return Vector3(c.x, 0.0, c.z)
+
+func _is_elevated() -> bool:
+	return _base_y > Config.FLOOR_TOP_OFFSET + 0.05
+
+## 起点若吸到墙顶/梯顶角，铺板顶面与该标高齐平；否则沿用瞄准表面（已有地板/楼梯顶）。
+func _elevation_for_start(p: Vector3) -> float:
+	if p.y > Config.FLOOR_TOP_OFFSET + 0.05:
+		return p.y
+	var aim := world.aim_surface(camera_rig)
+	if aim.is_empty():
+		return Config.FLOOR_TOP_OFFSET
+	var body: Object = aim.get("body")
+	if body == null or not body.has_meta("kind"):
+		return Config.FLOOR_TOP_OFFSET
+	var k: String = body.get_meta("kind")
+	if k == "stair" or k == "floor_tile":
+		return world.top_surface_y(body)
+	if k == "wall":
+		var top := world.top_surface_y(body)
+		if float(aim["point"].y) >= top - 1.0:
+			return top
+	return Config.FLOOR_TOP_OFFSET
 
 ## 地板矩形：水平方向四周外扩 EMBED、底部下沉 EMBED（顶面标高不变）。
 ## 侧边埋入相邻地板/墙体、底面埋入地面，相交面互相穿过而非共面，消除闪烁。
@@ -157,11 +191,13 @@ func _rect() -> Dictionary:
 	var max_x: float = maxf(_start.x, _end.x)
 	var min_z: float = minf(_start.z, _end.z)
 	var max_z: float = maxf(_start.z, _end.z)
-	var ex := _extend_edges(min_x, max_x, min_z, max_z)
-	min_x = ex[0]
-	max_x = ex[1]
-	min_z = ex[2]
-	max_z = ex[3]
+	# 墙顶铺板：顶点必须落在墙顶外角，不再把边收进墙厚带。
+	if not _is_elevated():
+		var ex := _extend_edges(min_x, max_x, min_z, max_z)
+		min_x = ex[0]
+		max_x = ex[1]
+		min_z = ex[2]
+		max_z = ex[3]
 	var h := floor_thickness + Config.EMBED
 	return {
 		"size": Vector3(max_x - min_x + Config.EMBED * 2.0, h, max_z - min_z + Config.EMBED * 2.0),
@@ -258,15 +294,14 @@ func _update_rect_preview() -> void:
 	valid = _rect_free(r["center"], size)
 	_place_rect = r if valid else {}
 	_show_preview(r["center"], size, valid)
-	hud.set_length("地板 %.1f×%.1f m：%s" % [nom.x, nom.z, "可铺设" if valid else "与地板/设备重叠"])
+	hud.set_length("地板 %.1f×%.1f m：%s" % [nom.x, nom.z, "可铺设" if valid else "与设备重叠"])
 
-## 候选矩形是否无干涉。水平方向内缩（EMBED 外扩 + 1cm），避免与边缘贴合的
-## 相邻地板（同样外扩 EMBED）误判重叠；墙体 / 柱子不参与干涉（地板从其下方铺过，
-## 消除接缝），仅与地板、设备互斥。
+## 候选矩形是否无干涉。水平方向内缩（EMBED 外扩 + 1cm）。
+## 墙体 / 柱子 / 楼梯 / 地板不参与干涉（地板可从墙柱下方铺过，地板之间合并而非互斥），仅与设备互斥。
 func _rect_free(center: Vector3, size: Vector3) -> bool:
 	var shrink := Config.EMBED * 2.0 + 0.01
 	var test := Vector3(size.x - shrink, size.y, size.z - shrink)
-	return world.aabb_clear(AABB(center - test * 0.5, test), 0.0, [], ["wall", "column", "stair"])
+	return world.aabb_clear(AABB(center - test * 0.5, test), 0.0, [], ["wall", "column", "stair", "floor_tile"])
 
 func _show_preview(center: Vector3, size: Vector3, ok: bool) -> void:
 	if not size.is_equal_approx(_last_size):
@@ -319,14 +354,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_drawing = true
 				_start = p
 				_end = p
-				_base_y = Config.FLOOR_TOP_OFFSET
-				var aim := world.aim_surface(camera_rig)
-				if not aim.is_empty():
-					var body: Object = aim.get("body")
-					if body != null and body.has_meta("kind"):
-						var k: String = body.get_meta("kind")
-						if k == "stair" or k == "floor_tile":
-							_base_y = world.top_surface_y(body)
+				_base_y = _elevation_for_start(p)
 				_last_size = Vector3.ZERO
 				_update_rect_preview()
 			else:
@@ -356,14 +384,19 @@ func _cancel_drawing() -> void:
 func _place() -> void:
 	if not valid or not _preview_root.visible or _place_rect.is_empty():
 		_cancel_drawing()
-		hud.set_status("区域无效（过小或与地板/设备重叠），未铺设")
+		hud.set_status("区域无效（过小或与设备重叠），未铺设")
 		return
 	var r: Dictionary = _place_rect
 	var color := Config.material_color(material_id)
+	var n0: int = world.placed.size()
 	world.place_box(r["center"], r["size"], color, "floor_tile", 0.0, 0, "", material_id)
 	var nom := _nominal_size(r["size"])
+	var merged := world.placed.size() <= n0
 	_cancel_drawing()
-	hud.set_status("已铺设%s地板 %.1f×%.1f m" % [Config.material_label(material_id), nom.x, nom.z])
+	if merged:
+		hud.set_status("已铺设%s地板 %.1f×%.1f m，并与相邻地板合并" % [Config.material_label(material_id), nom.x, nom.z])
+	else:
+		hud.set_status("已铺设%s地板 %.1f×%.1f m" % [Config.material_label(material_id), nom.x, nom.z])
 
 func _update_hud() -> void:
 	hud.set_tool_info("地板：两点矩形 · 厚 %.2f m · 材质 %s · F1 参数 / F3 材质" % [

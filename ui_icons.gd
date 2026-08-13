@@ -16,6 +16,9 @@ static func draw(canvas: CanvasItem, icon: String, color: Color, size: float = 2
 		"device": _device(canvas, c, u, color)
 		"floor_tile": _floor_tile(canvas, c, u, color)
 		"stair": _stair(canvas, c, u, color)
+		"door": _door(canvas, c, u, color)
+		"window": _window(canvas, c, u, color)
+		"floor_hole": _floor_hole(canvas, c, u, color)
 		"delete": _delete(canvas, c, u, color)
 		"pickup": _pickup(canvas, c, u, color)
 		"array": _array(canvas, c, u, color)
@@ -114,6 +117,97 @@ static func _floor_tile(canvas: CanvasItem, c: Vector2, u: float, color: Color) 
 	var grid_col := color.darkened(0.3)
 	canvas.draw_line((apex + bl) * 0.5, (fr + bc) * 0.5, grid_col, 1.0 * u, true)
 	canvas.draw_line((apex + fr) * 0.5, (bl + bc) * 0.5, grid_col, 1.0 * u, true)
+	canvas.draw_polyline(PackedVector2Array([apex, fr, frb, bcb, blb, bl, apex]), color, 1.2 * u, true)
+
+## 地洞：扁平轴测楼板顶面挖出矩形洞口
+static func _floor_hole(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> void:
+	var hw := 8.0 * u
+	var hi := 3.0 * u
+	var ch := 2.2 * u
+	var apex := c + Vector2(0.0, -2.0 * hi)
+	var fr := c + Vector2(hw, -hi)
+	var bc := c + Vector2(0.0, 0.0)
+	var bl := c + Vector2(-hw, -hi)
+	var frb := fr + Vector2(0.0, ch)
+	var bcb := bc + Vector2(0.0, ch)
+	var blb := bl + Vector2(0.0, ch)
+	canvas.draw_colored_polygon(PackedVector2Array([apex, fr, bc, bl]), color.lightened(0.1))
+	canvas.draw_colored_polygon(PackedVector2Array([bl, bc, bcb, blb]), color.darkened(0.15))
+	canvas.draw_colored_polygon(PackedVector2Array([bc, fr, frb, bcb]), color.darkened(0.35))
+	var hole := PackedVector2Array([
+		_brick_pt(apex, fr, bl, 0.32, 0.32),
+		_brick_pt(apex, fr, bl, 0.32, 0.68),
+		_brick_pt(apex, fr, bl, 0.68, 0.68),
+		_brick_pt(apex, fr, bl, 0.68, 0.32),
+	])
+	canvas.draw_colored_polygon(hole, Color(0.96, 0.96, 0.97, 1.0))
+	canvas.draw_polyline(hole, color, 1.2 * u, true)
+	canvas.draw_polyline(PackedVector2Array([apex, fr, frb, bcb, blb, bl, apex]), color, 1.2 * u, true)
+
+## 门洞：轴测墙体 + 贴地矩形洞口
+static func _door(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> void:
+	var hw_fr := 7.5 * u
+	var hw_bl := 2.5 * u
+	var hi := 1.25 * u
+	var ch := 5.5 * u
+	var apex := c + Vector2(0.0, -2.0 * hi)
+	var fr := c + Vector2(hw_fr, -hi)
+	var bc := c + Vector2(0.0, 0.0)
+	var bl := c + Vector2(-hw_bl, -hi)
+	var frb := fr + Vector2(0.0, ch)
+	var bcb := bc + Vector2(0.0, ch)
+	var blb := bl + Vector2(0.0, ch)
+	canvas.draw_colored_polygon(PackedVector2Array([apex, fr, bc, bl]), color.lightened(0.1))
+	canvas.draw_colored_polygon(PackedVector2Array([bl, bc, bcb, blb]), color.darkened(0.15))
+	var mortar := color.darkened(0.55)
+	canvas.draw_colored_polygon(PackedVector2Array([bc, fr, frb, bcb]), mortar)
+	var hole := PackedVector2Array([
+		_brick_pt(bc, fr, bcb, 0.28, 0.32),
+		_brick_pt(bc, fr, bcb, 0.28, 0.68),
+		_brick_pt(bc, fr, bcb, 1.0, 0.68),
+		_brick_pt(bc, fr, bcb, 1.0, 0.32),
+	])
+	_draw_bricks(canvas, bc, fr, bcb, color.darkened(0.3), 0.13)
+	canvas.draw_colored_polygon(hole, Color(0.96, 0.96, 0.97, 1.0))
+	canvas.draw_polyline(hole, color, 1.2 * u, true)
+	canvas.draw_polyline(PackedVector2Array([apex, fr, frb, bcb, blb, bl, apex]), color, 1.2 * u, true)
+
+## 窗洞：轴测墙体 + 中部方形窗洞
+static func _window(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> void:
+	var hw_fr := 7.5 * u
+	var hw_bl := 2.5 * u
+	var hi := 1.25 * u
+	var ch := 5.5 * u
+	var apex := c + Vector2(0.0, -2.0 * hi)
+	var fr := c + Vector2(hw_fr, -hi)
+	var bc := c + Vector2(0.0, 0.0)
+	var bl := c + Vector2(-hw_bl, -hi)
+	var frb := fr + Vector2(0.0, ch)
+	var bcb := bc + Vector2(0.0, ch)
+	var blb := bl + Vector2(0.0, ch)
+	canvas.draw_colored_polygon(PackedVector2Array([apex, fr, bc, bl]), color.lightened(0.1))
+	canvas.draw_colored_polygon(PackedVector2Array([bl, bc, bcb, blb]), color.darkened(0.15))
+	var mortar := color.darkened(0.55)
+	canvas.draw_colored_polygon(PackedVector2Array([bc, fr, frb, bcb]), mortar)
+	var hole := PackedVector2Array([
+		_brick_pt(bc, fr, bcb, 0.22, 0.28),
+		_brick_pt(bc, fr, bcb, 0.22, 0.72),
+		_brick_pt(bc, fr, bcb, 0.62, 0.72),
+		_brick_pt(bc, fr, bcb, 0.62, 0.28),
+	])
+	_draw_bricks(canvas, bc, fr, bcb, color.darkened(0.3), 0.13)
+	canvas.draw_colored_polygon(hole, Color(0.96, 0.96, 0.97, 1.0))
+	canvas.draw_polyline(hole, color, 1.2 * u, true)
+	var mid_v := PackedVector2Array([
+		_brick_pt(bc, fr, bcb, 0.22, 0.5),
+		_brick_pt(bc, fr, bcb, 0.62, 0.5),
+	])
+	var mid_h := PackedVector2Array([
+		_brick_pt(bc, fr, bcb, 0.42, 0.28),
+		_brick_pt(bc, fr, bcb, 0.42, 0.72),
+	])
+	canvas.draw_line(mid_v[0], mid_v[1], color, 1.0 * u, true)
+	canvas.draw_line(mid_h[0], mid_h[1], color, 1.0 * u, true)
 	canvas.draw_polyline(PackedVector2Array([apex, fr, frb, bcb, blb, bl, apex]), color, 1.2 * u, true)
 
 ## 楼梯：轴测三级踏步
