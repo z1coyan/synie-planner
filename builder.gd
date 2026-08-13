@@ -187,7 +187,9 @@ func _place() -> void:
 	if tool == "column":
 		world.place_box(_preview_root.position, size, _current_color(), tool, 0.0, 0, "", material_id)
 	else:
-		world.place_box(_preview_root.position, size, _current_color(), tool, 0.0, 0, _current_name())
+		var local_size: Vector3 = library.current_device()["size"]
+		var yaw := float(rot_steps) * (PI * 0.5)
+		world.place_box(_preview_root.position, local_size, _current_color(), tool, yaw, 0, _current_name())
 
 func _update_hud() -> void:
 	var name_map := {"none": "无", "column": "柱子", "device": "设备"}

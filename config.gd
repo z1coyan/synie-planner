@@ -32,7 +32,9 @@ const COLUMN_HEIGHT := 5.0
 ## 柱子截面预设（米），E 键循环切换
 const COLUMN_SIZES := [0.4, 0.6, 0.8, 1.0]
 
-const DEVICE_SIZE := Vector3(2.0, 1.5, 1.0)
+## 默认设备尺寸：冲网机完整 footprint（柜体 2.0×2.2×0.8 m，另加右侧控制台与 +Z 前伸臂）。
+## 细节以 PunchMeshMachineParams.FOOTPRINT 为准。
+const DEVICE_SIZE := Vector3(2.42, 2.2, 1.5)
 
 const EYE_HEIGHT := 1.6
 const WALK_SPEED := 5.0

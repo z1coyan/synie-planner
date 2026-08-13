@@ -363,7 +363,7 @@ func _ignore_kinds(kind: String) -> Array:
 
 func _check_clear(center: Vector3, size: Vector3, yaw: float, kind: String, exclude: Array) -> bool:
 	var ignore := _ignore_kinds(kind)
-	if kind == "wall":
+	if kind == "wall" or not is_zero_approx(yaw):
 		var bs := BoxShape3D.new()
 		bs.size = size
 		return world.shape_clear(bs, Transform3D(Basis(Vector3.UP, yaw), center), Config.CLEARANCE, exclude, ignore)

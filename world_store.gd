@@ -15,6 +15,8 @@ func setup(content_parent: Node3D, ground: StaticBody3D) -> void:
 	ground_body = ground
 
 func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: float = 0.0, floor: int = 0, name: String = "", material: String = "") -> StaticBody3D:
+	if kind == "device" and name == PunchMeshMachineParams.DISPLAY_NAME:
+		return _place_punch_mesh_machine(cx, yaw, floor)
 	var body := StaticBody3D.new()
 	body.name = "%s_%d" % [kind, body.get_instance_id()]
 	body.position = cx
@@ -60,6 +62,25 @@ func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: floa
 	if kind == "device":
 		body.set_meta("name", name if name != "" else "设备")
 		_add_label(body, size, body.get_meta("name"))
+	content.add_child(body)
+	placed.append(body)
+	return body
+
+
+func _place_punch_mesh_machine(cx: Vector3, yaw: float, floor: int) -> StaticBody3D:
+	var body := PunchMeshMachineBuilder.build()
+	body.name = "device_%d" % body.get_instance_id()
+	body.position = cx
+	body.rotation.y = yaw
+	var fp := PunchMeshMachineParams.FOOTPRINT
+	body.set_meta("kind", "device")
+	body.set_meta("size", fp)
+	body.set_meta("color", PunchMeshMachineParams.COLOR_BODY)
+	body.set_meta("yaw", yaw)
+	body.set_meta("floor", floor)
+	body.set_meta("name", PunchMeshMachineParams.DISPLAY_NAME)
+	body.set_meta("device_id", PunchMeshMachineParams.ID)
+	_add_label(body, fp, PunchMeshMachineParams.DISPLAY_NAME)
 	content.add_child(body)
 	placed.append(body)
 	return body
