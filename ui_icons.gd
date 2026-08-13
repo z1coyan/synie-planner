@@ -15,6 +15,7 @@ static func draw(canvas: CanvasItem, icon: String, color: Color, size: float = 2
 		"column": _column(canvas, c, u, color)
 		"device": _device(canvas, c, u, color)
 		"floor_tile": _floor_tile(canvas, c, u, color)
+		"stair": _stair(canvas, c, u, color)
 		"delete": _delete(canvas, c, u, color)
 		"pickup": _pickup(canvas, c, u, color)
 		"array": _array(canvas, c, u, color)
@@ -114,6 +115,28 @@ static func _floor_tile(canvas: CanvasItem, c: Vector2, u: float, color: Color) 
 	canvas.draw_line((apex + bl) * 0.5, (fr + bc) * 0.5, grid_col, 1.0 * u, true)
 	canvas.draw_line((apex + fr) * 0.5, (bl + bc) * 0.5, grid_col, 1.0 * u, true)
 	canvas.draw_polyline(PackedVector2Array([apex, fr, frb, bcb, blb, bl, apex]), color, 1.2 * u, true)
+
+## 楼梯：轴测三级踏步
+static func _stair(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> void:
+	var w := 1.2 * u
+	var steps := [
+		PackedVector2Array([
+			c + Vector2(-8.0 * u, 7.0 * u), c + Vector2(2.0 * u, 7.0 * u),
+			c + Vector2(2.0 * u, 3.2 * u), c + Vector2(-8.0 * u, 3.2 * u),
+		]),
+		PackedVector2Array([
+			c + Vector2(-4.5 * u, 3.2 * u), c + Vector2(5.5 * u, 3.2 * u),
+			c + Vector2(5.5 * u, -0.6 * u), c + Vector2(-4.5 * u, -0.6 * u),
+		]),
+		PackedVector2Array([
+			c + Vector2(-1.0 * u, -0.6 * u), c + Vector2(9.0 * u, -0.6 * u),
+			c + Vector2(9.0 * u, -4.4 * u), c + Vector2(-1.0 * u, -4.4 * u),
+		]),
+	]
+	var shades := [0.35, 0.18, 0.0]
+	for i in range(steps.size()):
+		canvas.draw_colored_polygon(steps[i], color.darkened(shades[i]))
+		canvas.draw_polyline(steps[i], color, w, true)
 
 ## 拆除：垃圾桶（桶身梯形 + 盖子 + 提手 + 内部竖线）
 static func _delete(canvas: CanvasItem, c: Vector2, u: float, color: Color) -> void:

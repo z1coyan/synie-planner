@@ -3,7 +3,7 @@ extends Node3D
 
 ## 地板工具：两段式点击。点击起点（点1）、移动鼠标预览、点击终点（点2），
 ## 铺设两点间的矩形地板（单块，任意尺寸，与画墙一致）。
-## 端点磁吸柱子 / 墙体 / 其他地板的角点，便于对齐拼接（无全局网格吸附）。
+## 端点磁吸柱子 / 墙体 / 其他地板 / 楼梯顶踏四角，便于对齐拼接（无全局网格吸附）。
 ## 起点必须在地面、已有地板或墙柱表面；墙体/柱子不阻挡（地板从其下方铺过），
 ## 地板与其他地板、设备互斥。绿=可放 / 红=与地板或设备重叠，右键取消笔画或退出工具。
 
@@ -23,6 +23,7 @@ var valid := false
 var _drawing := false
 var _start := Vector3.ZERO      # 起点（XZ，Y=0）
 var _end := Vector3.ZERO        # 终点（XZ，Y=0）
+var _base_y := Config.FLOOR_TOP_OFFSET
 var _place_rect: Dictionary = {}  # 预览通过的待铺矩形（含边缘外推回退结果）
 
 var _preview_root: Node3D
@@ -122,6 +123,8 @@ func _physics_process(_delta: float) -> void:
 
 ## 标记悬浮高度：略高于地面标高，避免与地板面穿插。
 func _mark_y() -> float:
+	if _drawing:
+		return _base_y + 0.11
 	return Config.FLOOR_TOP_OFFSET + 0.11
 
 ## 由当前瞄准点计算端点：地面 / 地板 / 墙 / 柱表面 → 角点磁吸（无网格）；其它 → null。
@@ -133,14 +136,14 @@ func _aim_point() -> Variant:
 	if body == world.ground_body:
 		return _snap_point(aim["point"])
 	if body != null and body.has_meta("kind") \
-			and ["floor_tile", "wall", "column"].has(body.get_meta("kind")):
+			and ["floor_tile", "wall", "column", "stair"].has(body.get_meta("kind")):
 		return _snap_point(aim["point"])
 	return null
 
 ## 先在原始点附近磁吸柱子 / 墙体 / 地板的角点；找不到再退回 0.5m 网格吸附。
 ## （顺序不能反：先网格吸附会偏移最多 0.35m，导致不在网格上的角点超出阈值。）
 func _snap_point(p: Vector3) -> Vector3:
-	var s := world.snap_to_corners(p, ["column", "wall", "floor_tile"], Config.SNAP_TO_CORNER)
+	var s := world.snap_to_corners(p, ["column", "wall", "floor_tile", "stair"], Config.SNAP_TO_CORNER)
 	if s != p:
 		return s
 	return Vector3(p.x, 0.0, p.z)
@@ -163,7 +166,7 @@ func _rect() -> Dictionary:
 	return {
 		"size": Vector3(max_x - min_x + Config.EMBED * 2.0, h, max_z - min_z + Config.EMBED * 2.0),
 		"center": Vector3((min_x + max_x) * 0.5,
-			Config.FLOOR_TOP_OFFSET + h * 0.5 - Config.EMBED,
+			_base_y + h * 0.5 - Config.EMBED,
 			(min_z + max_z) * 0.5),
 	}
 
@@ -263,7 +266,7 @@ func _update_rect_preview() -> void:
 func _rect_free(center: Vector3, size: Vector3) -> bool:
 	var shrink := Config.EMBED * 2.0 + 0.01
 	var test := Vector3(size.x - shrink, size.y, size.z - shrink)
-	return world.aabb_clear(AABB(center - test * 0.5, test), 0.0, [], ["wall", "column"])
+	return world.aabb_clear(AABB(center - test * 0.5, test), 0.0, [], ["wall", "column", "stair"])
 
 func _show_preview(center: Vector3, size: Vector3, ok: bool) -> void:
 	if not size.is_equal_approx(_last_size):
@@ -316,6 +319,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				_drawing = true
 				_start = p
 				_end = p
+				_base_y = Config.FLOOR_TOP_OFFSET
+				var aim := world.aim_surface(camera_rig)
+				if not aim.is_empty():
+					var body: Object = aim.get("body")
+					if body != null and body.has_meta("kind"):
+						var k: String = body.get_meta("kind")
+						if k == "stair" or k == "floor_tile":
+							_base_y = world.top_surface_y(body)
 				_last_size = Vector3.ZERO
 				_update_rect_preview()
 			else:
@@ -336,6 +347,7 @@ func _cancel_drawing() -> void:
 	_drawing = false
 	valid = false
 	_place_rect = {}
+	_base_y = Config.FLOOR_TOP_OFFSET
 	_preview_root.visible = false
 	_start_marker.visible = false
 	hud.set_length("")

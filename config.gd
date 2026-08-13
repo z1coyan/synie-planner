@@ -32,11 +32,26 @@ const COLUMN_HEIGHT := 5.0
 ## 柱子截面预设（米），E 键循环切换
 const COLUMN_SIZES := [0.4, 0.6, 0.8, 1.0]
 
+## 楼梯默认：一层与墙/柱同高；长度按舒适踏步（升 ~0.17 / 踏 ~0.28）匹配可走坡度。
+const STAIR_WIDTH := 1.2
+const STAIR_HEIGHT := 5.0
+const STAIR_LENGTH := 8.0
+const STAIR_RISE := 0.17
+
 const DEVICE_SIZE := Vector3(2.0, 1.5, 1.0)
 
 const EYE_HEIGHT := 1.6
+const PLAYER_HEIGHT := 1.7
+const PLAYER_RADIUS := 0.22
+## 跳跃竖直高度（米）；落地前空格无效
+const JUMP_HEIGHT := 1.1
 const WALK_SPEED := 5.0
+const RUN_SPEED := 8.5
 const FLY_SPEED := 10.0
+## 滞空水平操控系数（相对地面速度）
+const AIR_CONTROL := 0.35
+## 与 ProjectSettings physics/3d/default_gravity 一致；角色优先用 get_gravity()
+const GRAVITY := 9.8
 const TOP_DOWN_SPEED := 20.0
 const TOP_DOWN_START := 60.0
 const TOP_DOWN_MIN := 6.0

@@ -1,10 +1,12 @@
 extends Node3D
 
 var world: WorldStore
+var player: Player
 var camera_rig: CameraController
 var builder: Builder
 var wall_tool: WallTool
 var floor_tile_tool: FloorTileTool
+var stair_tool: StairTool
 var hud: Hud
 var menu: PauseMenu
 var ground_grid: GroundGrid
@@ -17,6 +19,7 @@ var hotbar: Hotbar
 var param_bar: ParamBar
 var material_panel: MaterialPanel
 var tool_params_panel: ToolParamsPanel
+var save_system: SaveSystem
 
 var current_tool := "none"
 
@@ -45,10 +48,11 @@ func _ready() -> void:
 	library = ElementLibrary.new()
 	library.setup()
 
-	camera_rig = CameraController.new()
-	camera_rig.name = "CameraRig"
-	add_child(camera_rig)
-	camera_rig.setup()
+	player = Player.new()
+	player.name = "Player"
+	add_child(player)
+	player.setup(self)
+	camera_rig = player.camera_rig
 	ground_terrain.set_camera(camera_rig)
 	process_physics_priority = 20
 
@@ -56,6 +60,7 @@ func _ready() -> void:
 	hud.name = "Hud"
 	add_child(hud)
 	hud.setup()
+	player.hud = hud
 
 	hotbar = Hotbar.new()
 	hotbar.name = "Hotbar"
@@ -100,6 +105,12 @@ func _ready() -> void:
 	floor_tile_tool.setup(world, camera_rig, hud, self)
 	floor_tile_tool.exit_requested.connect(_on_tool_exit)
 
+	stair_tool = StairTool.new()
+	stair_tool.name = "StairTool"
+	add_child(stair_tool)
+	stair_tool.setup(world, camera_rig, hud, self)
+	stair_tool.exit_requested.connect(_on_tool_exit)
+
 	delete_tool = DeleteTool.new()
 	delete_tool.name = "DeleteTool"
 	add_child(delete_tool)
@@ -117,10 +128,16 @@ func _ready() -> void:
 	library_panel.setup(library, builder, camera_rig, hud)
 	library_panel.device_selected.connect(_on_device_selected)
 
+	save_system = SaveSystem.new()
+	save_system.name = "SaveSystem"
+	add_child(save_system)
+	save_system.setup(world, player)
+	save_system.world_reset.connect(_on_world_reset)
+
 	menu = PauseMenu.new()
 	menu.name = "PauseMenu"
 	add_child(menu)
-	menu.setup(camera_rig)
+	menu.setup(camera_rig, save_system)
 
 	_set_tool("none")
 
@@ -128,8 +145,15 @@ func is_material_dialog_open() -> bool:
 	return material_panel != null and material_panel.is_open()
 
 func is_any_dialog_open() -> bool:
-	return (material_panel != null and material_panel.is_open()) \
-			or (tool_params_panel != null and tool_params_panel.is_open())
+	if material_panel != null and material_panel.is_open():
+		return true
+	if tool_params_panel != null and tool_params_panel.is_open():
+		return true
+	if library_panel != null and library_panel.is_open():
+		return true
+	if select_tool != null and select_tool.has_method("is_array_dialog_open") and select_tool.is_array_dialog_open():
+		return true
+	return false
 
 func sync_param_bar() -> void:
 	if is_any_dialog_open():
@@ -140,6 +164,8 @@ func sync_param_bar() -> void:
 		param_bar.show_context("placement", "wall", wall_tool.material_id, false)
 	elif current_tool == "floor_tile":
 		param_bar.show_context("placement", "floor_tile", floor_tile_tool.material_id, false)
+	elif current_tool == "stair":
+		param_bar.show_context("placement", "stair", stair_tool.material_id, false)
 	elif current_tool == "none" and select_tool != null and select_tool.wants_param_bar():
 		select_tool.sync_param_bar(param_bar)
 	else:
@@ -172,6 +198,8 @@ func _open_tool_params() -> void:
 				dims = wall_tool.get_placement_dims()
 			"floor_tile":
 				dims = floor_tile_tool.get_placement_dims()
+			"stair":
+				dims = stair_tool.get_placement_dims()
 	elif ctx == "selection":
 		dims = select_tool.get_selected_logical_dims()
 	else:
@@ -196,6 +224,8 @@ func _on_tool_params_confirmed() -> void:
 				wall_tool.apply_placement_dims(dims)
 			"floor_tile":
 				floor_tile_tool.apply_placement_dims(dims)
+			"stair":
+				stair_tool.apply_placement_dims(dims)
 		hud.set_status("已更新放置参数（F1 可再改）")
 	elif ctx == "selection":
 		select_tool.apply_selected_dims(dims)
@@ -214,6 +244,8 @@ func _on_tool_params_cancelled() -> void:
 		wall_tool.refresh_material_hud()
 	elif current_tool == "floor_tile":
 		floor_tile_tool.refresh_material_hud()
+	elif current_tool == "stair":
+		stair_tool.refresh_material_hud()
 
 func _on_material_confirmed() -> void:
 	if material_panel == null:
@@ -233,6 +265,9 @@ func _on_material_confirmed() -> void:
 			"floor_tile":
 				floor_tile_tool.material_id = mat
 				floor_tile_tool.refresh_material_hud()
+			"stair":
+				stair_tool.material_id = mat
+				stair_tool.refresh_material_hud()
 		param_bar.set_material(mat)
 		hud.set_status("材质：%s（F3 可再改）" % Config.material_label(mat))
 	elif ctx == "selection":
@@ -251,8 +286,15 @@ func _on_material_cancelled() -> void:
 		wall_tool.refresh_material_hud()
 	elif current_tool == "floor_tile":
 		floor_tile_tool.refresh_material_hud()
+	elif current_tool == "stair":
+		stair_tool.refresh_material_hud()
 	elif current_tool == "none":
 		select_tool.refresh_status_after_material()
+
+func _on_world_reset() -> void:
+	_set_tool("none")
+	if hud != null:
+		hud.set_status("场景已更新")
 
 func _on_tool_exit() -> void:
 	_set_tool("none")
@@ -360,6 +402,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_4:
 				_set_tool("floor_tile")
 				get_viewport().set_input_as_handled()
+			KEY_5:
+				_set_tool("stair")
+				get_viewport().set_input_as_handled()
 			KEY_X:
 				_set_tool("delete")
 				get_viewport().set_input_as_handled()
@@ -380,6 +425,7 @@ func _set_tool(t: String) -> void:
 	current_tool = t
 	wall_tool.set_active(t == "wall")
 	floor_tile_tool.set_active(t == "floor_tile")
+	stair_tool.set_active(t == "stair")
 	delete_tool.set_active(t == "delete")
 	select_tool.set_active(t == "none")
 	builder.set_tool("column" if t == "column" else "device" if t == "device" else "none")
@@ -389,7 +435,7 @@ func _set_tool(t: String) -> void:
 		ground_grid.set_patch_visible(false)
 
 func _is_placement_tool(t: String) -> bool:
-	return t == "column" or t == "wall" or t == "floor_tile" or t == "device"
+	return t == "column" or t == "wall" or t == "floor_tile" or t == "stair" or t == "device"
 
 ## 放置工具激活且有有效瞄准时，把局部网格贴在物体脚点下；否则立刻隐藏。
 func _physics_process(_delta: float) -> void:
@@ -413,6 +459,9 @@ func _sync_placement_grid() -> void:
 		"floor_tile":
 			origin = floor_tile_tool.get_grid_origin()
 			extent = floor_tile_tool.get_grid_extent()
+		"stair":
+			origin = stair_tool.get_grid_origin()
+			extent = stair_tool.get_grid_extent()
 	if origin == null:
 		ground_grid.set_patch_visible(false)
 		return

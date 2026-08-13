@@ -3,12 +3,13 @@ extends Node3D
 
 ## 已放置物体的统一仓库：负责创建碰撞体、查询干涉、拾取表面。
 
-const MATERIAL_KINDS := ["floor_tile", "column", "wall"]
+const MATERIAL_KINDS := ["floor_tile", "column", "wall", "stair"]
 
 var content: Node3D
 var ground_body: StaticBody3D
 var placed: Array = []
 var labels_visible := true
+var dirty := false
 
 func setup(content_parent: Node3D, ground: StaticBody3D) -> void:
 	content = content_parent
@@ -62,9 +63,110 @@ func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: floa
 		_add_label(body, size, body.get_meta("name"))
 	content.add_child(body)
 	placed.append(body)
+	dirty = true
 	return body
 
-## 立即更新柱/墙/地板的材质外观与 meta。
+func place_stair(center: Vector3, width: float, length: float, height: float, yaw: float, material: String = "") -> StaticBody3D:
+	var mat_id := Config.normalize_material(material if material != "" else Config.DEFAULT_MATERIAL)
+	var body := StaticBody3D.new()
+	body.name = "stair_%d" % body.get_instance_id()
+	body.position = center
+	body.rotation.y = yaw
+	body.collision_layer = 1
+	body.collision_mask = 0
+	var mat := _surface_mat(mat_id)
+	attach_stair_geom(body, width, length, height, mat, true)
+	var size := Vector3(width, height, length)
+	body.set_meta("kind", "stair")
+	body.set_meta("size", size)
+	body.set_meta("width", width)
+	body.set_meta("length", length)
+	body.set_meta("height", height)
+	body.set_meta("yaw", yaw)
+	body.set_meta("facing", yaw)
+	body.set_meta("material", mat_id)
+	body.set_meta("color", mat.albedo_color)
+	body.set_meta("floor", 0)
+	content.add_child(body)
+	placed.append(body)
+	dirty = true
+	return body
+
+static func stair_step_count(height: float) -> int:
+	return maxi(1, int(round(maxf(height, 0.2) / Config.STAIR_RISE)))
+
+## 在 parent 局部空间生成踏步网格；with_collision 时附加踏步盒 + 坡面凸包。
+static func attach_stair_geom(parent: Node3D, width: float, length: float, height: float, mat: Material, with_collision: bool) -> void:
+	var n := stair_step_count(height)
+	var rise := height / float(n)
+	var tread := length / float(n)
+	for i in n:
+		var mi := MeshInstance3D.new()
+		mi.name = "Step_%d" % i
+		var bm := BoxMesh.new()
+		bm.size = Vector3(width, rise, tread)
+		if mat != null:
+			bm.material = mat
+		mi.mesh = bm
+		mi.position = Vector3(
+			0.0,
+			-height * 0.5 + (float(i) + 0.5) * rise,
+			length * 0.5 - (float(i) + 0.5) * tread)
+		parent.add_child(mi)
+		if with_collision:
+			var cs := CollisionShape3D.new()
+			cs.name = "StepCol_%d" % i
+			var bs := BoxShape3D.new()
+			bs.size = bm.size
+			cs.shape = bs
+			cs.position = mi.position
+			parent.add_child(cs)
+	if with_collision:
+		var ramp := CollisionShape3D.new()
+		ramp.name = "RampCol"
+		var conv := ConvexPolygonShape3D.new()
+		var hw := width * 0.5
+		var hl := length * 0.5
+		var hh := height * 0.5
+		conv.points = PackedVector3Array([
+			Vector3(-hw, -hh, hl),
+			Vector3(hw, -hh, hl),
+			Vector3(-hw, -hh, -hl),
+			Vector3(hw, -hh, -hl),
+			Vector3(-hw, hh, -hl),
+			Vector3(hw, hh, -hl),
+		])
+		ramp.shape = conv
+		parent.add_child(ramp)
+
+## 楼梯最高踏步顶面四角（世界坐标），供地板磁吸。
+static func stair_top_corners(obj: StaticBody3D) -> Array:
+	var width := float(obj.get_meta("width"))
+	var length := float(obj.get_meta("length"))
+	var height := float(obj.get_meta("height"))
+	var yaw := float(obj.get_meta("yaw")) if obj.has_meta("yaw") else 0.0
+	var n := stair_step_count(height)
+	var tread := length / float(n)
+	var c: Vector3 = obj.global_position
+	var dx := Vector3(cos(yaw), 0.0, -sin(yaw))
+	var dz := Vector3(sin(yaw), 0.0, cos(yaw))
+	var hx := width * 0.5
+	var z_front := -length * 0.5
+	var z_back := z_front + tread
+	var top := Vector3(0.0, height * 0.5, 0.0)
+	return [
+		c + dx * hx + dz * z_front + top,
+		c + dx * -hx + dz * z_front + top,
+		c + dx * hx + dz * z_back + top,
+		c + dx * -hx + dz * z_back + top,
+	]
+
+func snap_corners_of(obj: StaticBody3D) -> Array:
+	if obj != null and obj.has_meta("kind") and obj.get_meta("kind") == "stair":
+		return stair_top_corners(obj)
+	return obb_corners(obj)
+
+## 立即更新柱/墙/地板/楼梯的材质外观与 meta。
 func set_body_material(body: StaticBody3D, material_id: String) -> void:
 	if body == null or not is_instance_valid(body):
 		return
@@ -74,6 +176,7 @@ func set_body_material(body: StaticBody3D, material_id: String) -> void:
 	var mat := _surface_mat(mat_id)
 	body.set_meta("material", mat_id)
 	body.set_meta("color", mat.albedo_color)
+	dirty = true
 	for child in body.get_children():
 		if String(child.name) == "_SelectHL":
 			continue
@@ -82,9 +185,8 @@ func set_body_material(body: StaticBody3D, material_id: String) -> void:
 			bm.material = mat
 			child.material_override = null
 
-
-## 按逻辑尺寸更新柱/墙/地板几何（立即生效，底面或顶面尽量保持）。
-## dims: column/wall → height, thickness；floor_tile → thickness。墙长度保持不变。
+## 按逻辑尺寸更新柱/墙/地板/楼梯几何（立即生效，底面或顶面尽量保持）。
+## dims: column/wall → height, thickness；floor_tile → thickness；stair → width, length, height。
 func set_body_dims(body: StaticBody3D, dims: Dictionary) -> void:
 	if body == null or not is_instance_valid(body):
 		return
@@ -114,14 +216,35 @@ func set_body_dims(body: StaticBody3D, dims: Dictionary) -> void:
 		"floor_tile":
 			var th2 := float(dims.get("thickness", Config.FLOOR_THICKNESS))
 			var h3 := th2 + Config.EMBED
-			# 保持顶面标高（与铺设一致）
 			var top_y := pos.y + old_size.y * 0.5
 			new_size = Vector3(old_size.x, h3, old_size.z)
 			pos.y = top_y - h3 * 0.5
+		"stair":
+			var nw := maxf(0.4, float(dims.get("width", body.get_meta("width"))))
+			var nl := maxf(0.5, float(dims.get("length", body.get_meta("length"))))
+			var nh := maxf(0.3, float(dims.get("height", body.get_meta("height"))))
+			var old_h := float(body.get_meta("height"))
+			var old_l := float(body.get_meta("length"))
+			var fwd := Vector3(-sin(yaw), 0.0, -cos(yaw))
+			var start := pos - fwd * (old_l * 0.5)
+			var base_y3 := pos.y - old_h * 0.5
+			pos = start + fwd * (nl * 0.5)
+			pos.y = base_y3 + nh * 0.5
+			new_size = Vector3(nw, nh, nl)
+			body.global_position = pos
+			body.rotation.y = yaw
+			body.set_meta("size", new_size)
+			body.set_meta("width", nw)
+			body.set_meta("length", nl)
+			body.set_meta("height", nh)
+			_rebuild_stair_geom(body, nw, nl, nh)
+			dirty = true
+			return
 		_:
 			return
 	body.global_position = pos
 	body.set_meta("size", new_size)
+	dirty = true
 	for child in body.get_children():
 		if String(child.name) == "_SelectHL":
 			continue
@@ -132,11 +255,101 @@ func set_body_dims(body: StaticBody3D, dims: Dictionary) -> void:
 			(child.shape as BoxShape3D).size = new_size
 			child.rotation.y = yaw
 
+func _rebuild_stair_geom(body: StaticBody3D, width: float, length: float, height: float) -> void:
+	var to_free: Array = []
+	for child in body.get_children():
+		if String(child.name) == "_SelectHL":
+			continue
+		if child is MeshInstance3D or child is CollisionShape3D:
+			to_free.append(child)
+	for n in to_free:
+		body.remove_child(n)
+		n.free()
+	var mat_id := Config.DEFAULT_MATERIAL
+	if body.has_meta("material"):
+		mat_id = Config.normalize_material(String(body.get_meta("material")))
+	attach_stair_geom(body, width, length, height, _surface_mat(mat_id), true)
+
 ## 删除已放置物体：从仓库登记中移除并销毁节点。
 func remove(body: StaticBody3D) -> void:
 	placed.erase(body)
+	dirty = true
 	if is_instance_valid(body):
 		body.queue_free()
+
+func clear_placed() -> void:
+	var copy := placed.duplicate()
+	placed.clear()
+	for obj in copy:
+		if is_instance_valid(obj):
+			obj.queue_free()
+	dirty = false
+
+func serialize_placed() -> Array:
+	var out: Array = []
+	for obj in placed:
+		if not is_instance_valid(obj) or not obj.has_meta("kind"):
+			continue
+		var kind := String(obj.get_meta("kind"))
+		var rec := {
+			"kind": kind,
+			"position": _vec_to_arr(obj.global_position),
+			"yaw": float(obj.get_meta("yaw")) if obj.has_meta("yaw") else 0.0,
+			"floor": int(obj.get_meta("floor")) if obj.has_meta("floor") else 0,
+		}
+		if obj.has_meta("size"):
+			rec["size"] = _vec_to_arr(obj.get_meta("size"))
+		if obj.has_meta("material"):
+			rec["material"] = String(obj.get_meta("material"))
+		if obj.has_meta("name"):
+			rec["name"] = String(obj.get_meta("name"))
+		if obj.has_meta("color"):
+			var col: Color = obj.get_meta("color")
+			rec["color"] = [col.r, col.g, col.b, col.a]
+		if kind == "stair":
+			rec["width"] = float(obj.get_meta("width"))
+			rec["length"] = float(obj.get_meta("length"))
+			rec["height"] = float(obj.get_meta("height"))
+			rec["facing"] = float(obj.get_meta("facing")) if obj.has_meta("facing") else rec["yaw"]
+		out.append(rec)
+	return out
+
+func restore_placed(records: Array) -> void:
+	clear_placed()
+	for rec_v in records:
+		if typeof(rec_v) != TYPE_DICTIONARY:
+			continue
+		var rec: Dictionary = rec_v
+		var kind := String(rec.get("kind", ""))
+		var pos := _arr_to_vec(rec.get("position", [0.0, 0.0, 0.0]))
+		var yaw := float(rec.get("yaw", 0.0))
+		var floor_i := int(rec.get("floor", 0))
+		var mat := String(rec.get("material", ""))
+		var name_s := String(rec.get("name", ""))
+		if kind == "stair":
+			place_stair(
+				pos,
+				float(rec.get("width", Config.STAIR_WIDTH)),
+				float(rec.get("length", Config.STAIR_LENGTH)),
+				float(rec.get("height", Config.STAIR_HEIGHT)),
+				yaw, mat)
+		elif kind != "":
+			var size := _arr_to_vec(rec.get("size", [1.0, 1.0, 1.0]))
+			var col := Config.COLOR_DEVICE
+			if rec.has("color") and rec["color"] is Array:
+				var ca: Array = rec["color"]
+				if ca.size() >= 3:
+					col = Color(float(ca[0]), float(ca[1]), float(ca[2]), float(ca[3]) if ca.size() > 3 else 1.0)
+			place_box(pos, size, col, kind, yaw, floor_i, name_s, mat)
+	dirty = false
+
+static func _vec_to_arr(v: Vector3) -> Array:
+	return [v.x, v.y, v.z]
+
+static func _arr_to_vec(a: Variant) -> Vector3:
+	if a is Array and a.size() >= 3:
+		return Vector3(float(a[0]), float(a[1]), float(a[2]))
+	return Vector3.ZERO
 
 func _add_label(body: StaticBody3D, size: Vector3, text: String) -> void:
 	var label := Label3D.new()
@@ -205,6 +418,8 @@ func toggle_labels() -> void:
 func top_surface_y(body: Node3D) -> float:
 	if body == ground_body:
 		return Config.FLOOR_TOP_OFFSET
+	if body != null and body.has_meta("kind") and body.get_meta("kind") == "stair" and body.has_meta("height"):
+		return body.global_position.y + float(body.get_meta("height")) * 0.5
 	if not body.has_meta("size"):
 		return 0.0
 	var size: Vector3 = body.get_meta("size")
@@ -277,14 +492,14 @@ func snap_to_column_inset(p: Vector3, inset: float, max_dist: float) -> Vector3:
 	return best
 
 ## 磁吸：若 p（XZ 平面）距某指定 kinds 物体的角点小于 max_dist，
-## 返回最近的角点；否则返回 p。角点取物体底面矩形四角（考虑 yaw 旋转）。
+## 返回最近的角点；否则返回 p。楼梯取最高踏步顶面四角，其余取底面矩形四角。
 func snap_to_corners(p: Vector3, kinds: Array, max_dist: float) -> Vector3:
 	var best := p
 	var best_d := max_dist
 	for obj in placed:
 		if not obj.has_meta("kind") or not kinds.has(obj.get_meta("kind")):
 			continue
-		for corner in obb_corners(obj):
+		for corner in snap_corners_of(obj):
 			var d := Vector2(p.x - corner.x, p.z - corner.z).length()
 			if d < best_d:
 				best_d = d
@@ -339,7 +554,7 @@ func aim_surface(cc) -> Dictionary:
 		origin = cam.project_ray_origin(mpos)
 		dir = cam.project_ray_normal(mpos)
 	else:
-		origin = cc.global_position
+		origin = cam.global_position
 		dir = -cam.global_transform.basis.z
 	var hit := surface_ray(origin, dir, 400.0)
 	if hit.is_empty():

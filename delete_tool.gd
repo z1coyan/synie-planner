@@ -7,8 +7,8 @@ extends Node3D
 
 signal exit_requested
 
-const DELETABLE_KINDS := ["wall", "column", "device", "floor_tile"]
-const KIND_NAMES := {"wall": "墙体", "column": "柱子", "device": "设备", "floor_tile": "地板"}
+const DELETABLE_KINDS := ["wall", "column", "device", "floor_tile", "stair"]
+const KIND_NAMES := {"wall": "墙体", "column": "柱子", "device": "设备", "floor_tile": "地板", "stair": "楼梯"}
 
 var world: WorldStore
 var camera_rig: CameraController

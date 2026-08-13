@@ -2,12 +2,12 @@ class_name SelectTool
 extends Node3D
 
 ## 交互工具（快捷栏「无」）：准星点选已放置物体。
-## 柱/墙/地板选中后由 ParamBar 提供 F1 工具参数 / F2 阵列 / F3 材质。
+## 柱/墙/地板/楼梯选中后由 ParamBar 提供 F1 工具参数 / F2 阵列 / F3 材质。
 ## 设备选中后仅快捷栏 F2 阵列。取消选中用右键或点空白。
 
-const INTERACT_KINDS := ["wall", "column", "device", "floor_tile"]
-const KIND_NAMES := {"wall": "墙体", "column": "柱子", "device": "设备", "floor_tile": "地板"}
-const MATERIAL_KINDS := ["wall", "column", "floor_tile"]
+const INTERACT_KINDS := ["wall", "column", "device", "floor_tile", "stair"]
+const KIND_NAMES := {"wall": "墙体", "column": "柱子", "device": "设备", "floor_tile": "地板", "stair": "楼梯"}
+const MATERIAL_KINDS := ["wall", "column", "floor_tile", "stair"]
 const HL_NAME := "_SelectHL"
 const HL_PAD_HOVER := 0.03
 const HL_PAD_SELECTED := 0.05
@@ -61,6 +61,9 @@ var _array_yaw := 0.0
 var _array_floor := 0
 var _array_name := ""
 var _array_material := ""
+var _array_width := 0.0
+var _array_length := 0.0
+var _array_height := 0.0
 
 func setup(w: WorldStore, cc: CameraController, h: Hud, hb: Hotbar, main_host: Node = null) -> void:
 	world = w
@@ -128,6 +131,9 @@ func cancel() -> void:
 	_show_tool_bar()
 	_notify_host_param()
 
+func is_array_dialog_open() -> bool:
+	return _array_panel != null and _array_panel.is_open()
+
 func wants_param_bar() -> bool:
 	return mode == "selected" and is_instance_valid(_selected) \
 			and MATERIAL_KINDS.has(String(_selected.get_meta("kind")))
@@ -172,6 +178,12 @@ func get_selected_logical_dims() -> Dictionary:
 			}
 		"floor_tile":
 			return {"thickness": size.y - Config.EMBED}
+		"stair":
+			return {
+				"width": float(_selected.get_meta("width")) if _selected.has_meta("width") else size.x,
+				"length": float(_selected.get_meta("length")) if _selected.has_meta("length") else size.z,
+				"height": float(_selected.get_meta("height")) if _selected.has_meta("height") else size.y,
+			}
 		_:
 			return {}
 
@@ -401,12 +413,14 @@ func _ignore_kinds(kind: String) -> Array:
 			return ["wall", "column", "floor_tile"]
 		"floor_tile":
 			return ["wall", "column"]
+		"stair":
+			return ["wall", "column", "floor_tile"]
 		_:
 			return []
 
 func _check_clear(center: Vector3, size: Vector3, yaw: float, kind: String, exclude: Array) -> bool:
 	var ignore := _ignore_kinds(kind)
-	if kind == "wall":
+	if kind == "wall" or kind == "stair":
 		var bs := BoxShape3D.new()
 		bs.size = size
 		return world.shape_clear(bs, Transform3D(Basis(Vector3.UP, yaw), center), Config.CLEARANCE, exclude, ignore)
@@ -561,6 +575,9 @@ func _process_array() -> void:
 	_array_floor = floor_i
 	_array_name = name_s
 	_array_material = mat_s
+	_array_width = float(_selected.get_meta("width")) if _selected.has_meta("width") else size.x
+	_array_length = float(_selected.get_meta("length")) if _selected.has_meta("length") else size.z
+	_array_height = float(_selected.get_meta("height")) if _selected.has_meta("height") else size.y
 	var gi := 0
 	for j in _array_count_v:
 		for i in _array_count_u:
@@ -589,9 +606,14 @@ func _confirm_array() -> void:
 	for i in _array_centers.size():
 		if not _array_valids[i]:
 			continue
-		world.place_box(
-			_array_centers[i], _array_size, _array_color, _array_kind,
-			_array_yaw, _array_floor, _array_name, _array_material)
+		if _array_kind == "stair":
+			world.place_stair(
+				_array_centers[i], _array_width, _array_length, _array_height,
+				_array_yaw, _array_material)
+		else:
+			world.place_box(
+				_array_centers[i], _array_size, _array_color, _array_kind,
+				_array_yaw, _array_floor, _array_name, _array_material)
 		placed_n += 1
 	_hide_array_panel()
 	_clear_array_ghosts()

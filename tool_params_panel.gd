@@ -1,7 +1,7 @@
 class_name ToolParamsPanel
 extends CanvasLayer
 
-## 工具参数对话框：按种类编辑基本尺寸（柱高/粗细、墙高/厚、地板厚）。
+## 工具参数对话框：按种类编辑基本尺寸（柱高/粗细、墙高/厚、地板厚、楼梯宽/长/高）。
 
 signal confirmed
 signal cancelled
@@ -18,8 +18,12 @@ var _values: Dictionary = {}
 
 var _height_spin: SpinBox
 var _thickness_spin: SpinBox
+var _width_spin: SpinBox
+var _length_spin: SpinBox
 var _height_row_label: Label
 var _thickness_row_label: Label
+var _width_row_label: Label
+var _length_row_label: Label
 
 func setup(cc: CameraController) -> void:
 	camera_rig = cc
@@ -42,10 +46,10 @@ func setup(cc: CameraController) -> void:
 	_panel.anchor_top = 0.5
 	_panel.anchor_right = 0.5
 	_panel.anchor_bottom = 0.5
-	_panel.offset_left = -150.0
-	_panel.offset_top = -110.0
-	_panel.offset_right = 150.0
-	_panel.offset_bottom = 110.0
+	_panel.offset_left = -160.0
+	_panel.offset_top = -140.0
+	_panel.offset_right = 160.0
+	_panel.offset_bottom = 140.0
 	add_child(_panel)
 
 	var margin := MarginContainer.new()
@@ -74,10 +78,18 @@ func setup(cc: CameraController) -> void:
 	_form.mouse_filter = Control.MOUSE_FILTER_STOP
 	vb.add_child(_form)
 
+	_width_row_label = _mk_label("横向宽度")
+	_width_spin = _mk_float_spin(0.4, 20.0, 0.05, 1.2)
+	_length_row_label = _mk_label("前后长度")
+	_length_spin = _mk_float_spin(0.5, 40.0, 0.1, 8.0)
 	_height_row_label = _mk_label("高度")
 	_height_spin = _mk_float_spin(0.5, 50.0, 0.1, 5.0)
 	_thickness_row_label = _mk_label("厚度")
 	_thickness_spin = _mk_float_spin(0.1, 10.0, 0.05, 0.4)
+	_form.add_child(_width_row_label)
+	_form.add_child(_width_spin)
+	_form.add_child(_length_row_label)
+	_form.add_child(_length_spin)
 	_form.add_child(_height_row_label)
 	_form.add_child(_height_spin)
 	_form.add_child(_thickness_row_label)
@@ -142,6 +154,10 @@ func show_dialog(kind: String, values: Dictionary) -> void:
 	match kind:
 		"column":
 			_title.text = "柱子参数"
+			_width_row_label.visible = false
+			_width_spin.visible = false
+			_length_row_label.visible = false
+			_length_spin.visible = false
 			_height_row_label.text = "高度"
 			_thickness_row_label.text = "粗细"
 			_height_row_label.visible = true
@@ -158,6 +174,10 @@ func show_dialog(kind: String, values: Dictionary) -> void:
 			_thickness_spin.value = float(values.get("thickness", Config.COLUMN_SIZES[0]))
 		"wall":
 			_title.text = "墙体参数"
+			_width_row_label.visible = false
+			_width_spin.visible = false
+			_length_row_label.visible = false
+			_length_spin.visible = false
 			_height_row_label.text = "高度"
 			_thickness_row_label.text = "厚度"
 			_height_row_label.visible = true
@@ -174,6 +194,10 @@ func show_dialog(kind: String, values: Dictionary) -> void:
 			_thickness_spin.value = float(values.get("thickness", Config.WALL_THICKNESS_DEFAULT))
 		"floor_tile":
 			_title.text = "地板参数"
+			_width_row_label.visible = false
+			_width_spin.visible = false
+			_length_row_label.visible = false
+			_length_spin.visible = false
 			_height_row_label.visible = false
 			_height_spin.visible = false
 			_thickness_row_label.text = "厚度"
@@ -183,6 +207,28 @@ func show_dialog(kind: String, values: Dictionary) -> void:
 			_thickness_spin.max_value = 2.0
 			_thickness_spin.step = 0.05
 			_thickness_spin.value = float(values.get("thickness", Config.FLOOR_THICKNESS))
+		"stair":
+			_title.text = "楼梯参数"
+			_width_row_label.visible = true
+			_width_spin.visible = true
+			_length_row_label.visible = true
+			_length_spin.visible = true
+			_height_row_label.visible = true
+			_height_spin.visible = true
+			_thickness_row_label.visible = false
+			_thickness_spin.visible = false
+			_width_spin.min_value = 0.4
+			_width_spin.max_value = 20.0
+			_width_spin.step = 0.05
+			_length_spin.min_value = 0.5
+			_length_spin.max_value = 40.0
+			_length_spin.step = 0.1
+			_height_spin.min_value = 0.3
+			_height_spin.max_value = 50.0
+			_height_spin.step = 0.1
+			_width_spin.value = float(values.get("width", Config.STAIR_WIDTH))
+			_length_spin.value = float(values.get("length", Config.STAIR_LENGTH))
+			_height_spin.value = float(values.get("height", Config.STAIR_HEIGHT))
 		_:
 			cancelled.emit()
 			return
@@ -217,6 +263,12 @@ func _on_confirm() -> void:
 			}
 		"floor_tile":
 			_values = {"thickness": float(_thickness_spin.value)}
+		"stair":
+			_values = {
+				"width": float(_width_spin.value),
+				"length": float(_length_spin.value),
+				"height": float(_height_spin.value),
+			}
 	confirmed.emit()
 
 func _unhandled_input(event: InputEvent) -> void:

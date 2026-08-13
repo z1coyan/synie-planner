@@ -1,13 +1,13 @@
 class_name ParamBar
 extends CanvasLayer
 
-## 统一参数栏（柱/墙/地板）：放置或选中时浮于快捷栏上方。
+## 统一参数栏（柱/墙/地板/楼梯）：放置或选中时浮于快捷栏上方。
 ## F1 工具参数 · F2 阵列（仅选中） · F3 材质
 
 signal action_requested(action_id: String)
 
-const KIND_NAMES := {"column": "柱子", "wall": "墙体", "floor_tile": "地板"}
-const MATERIAL_KINDS := ["column", "wall", "floor_tile"]
+const KIND_NAMES := {"column": "柱子", "wall": "墙体", "floor_tile": "地板", "stair": "楼梯"}
+const MATERIAL_KINDS := ["column", "wall", "floor_tile", "stair"]
 
 var _root: HBoxContainer
 var _kind_label: Label

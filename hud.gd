@@ -4,6 +4,7 @@ extends CanvasLayer
 var _status: Label
 var _tool_info: Label
 var _length: Label
+var _move_hint: Label
 var _crosshair: Crosshair
 
 func setup() -> void:
@@ -33,9 +34,12 @@ func setup() -> void:
 	_status = _make_label(15, UiTheme.ACCENT)
 	_tool_info = _make_label(12, UiTheme.TEXT)
 	_length = _make_label(12, UiTheme.TEXT)
+	_move_hint = _make_label(11, UiTheme.TEXT_DIM)
+	_move_hint.text = "WASD 移动  Shift 奔跑  空格 跳跃  F 飞行/坠落  Tab 俯视"
 	vb.add_child(_status)
 	vb.add_child(_tool_info)
 	vb.add_child(_length)
+	vb.add_child(_move_hint)
 	add_child(panel)
 
 	_crosshair = Crosshair.new()
