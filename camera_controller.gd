@@ -74,6 +74,15 @@ func _apply_projection() -> void:
 	else:
 		camera.projection = Camera3D.PROJECTION_ORTHOGONAL
 		camera.size = top_height * 0.8
+	_sync_taa()
+
+
+func _sync_taa() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	# 正交俯视平移时 TAA 容易拖影；第一人称与 4x MSAA 组合良好
+	vp.use_taa = mode == "fp"
 
 func _physics_process(delta: float) -> void:
 	rotation.y = yaw

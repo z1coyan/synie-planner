@@ -226,3 +226,14 @@ func apply_placement_dims(dims: Dictionary) -> void:
 	col_size_index = best_i
 	_last_size = Vector3.ZERO
 	_update_hud()
+
+## 放置网格脚点（预览底面 XZ）。无效时返回 null。
+func get_grid_origin() -> Variant:
+	if tool == "none" or _preview_root == null or not _preview_root.visible:
+		return null
+	var p := _preview_root.position
+	return Vector3(p.x, 0.0, p.z)
+
+func get_grid_extent() -> float:
+	var s := _current_size()
+	return clampf(maxf(s.x, s.z) * 2.5 + 4.5, 4.0, 10.0)

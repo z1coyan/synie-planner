@@ -261,3 +261,13 @@ func apply_placement_dims(dims: Dictionary) -> void:
 	wall_height = float(dims.get("height", wall_height))
 	thickness = clampf(float(dims.get("thickness", thickness)), Config.WALL_THICKNESS_MIN, Config.WALL_THICKNESS_MAX)
 	_update_hud()
+
+## 放置网格脚点：跟随当前端点/光标。无效时返回 null。
+func get_grid_origin() -> Variant:
+	if not active or _end_marker == null or not _end_marker.visible:
+		return null
+	var p := _end_marker.position
+	return Vector3(p.x, 0.0, p.z)
+
+func get_grid_extent() -> float:
+	return 6.5

@@ -368,3 +368,13 @@ func apply_placement_dims(dims: Dictionary) -> void:
 	floor_thickness = maxf(0.1, float(dims.get("thickness", floor_thickness)))
 	_last_size = Vector3.ZERO
 	_update_hud()
+
+## 放置网格脚点：跟随当前光标/终点。无效时返回 null。
+func get_grid_origin() -> Variant:
+	if not active or _hover_marker == null or not _hover_marker.visible:
+		return null
+	var p := _hover_marker.position
+	return Vector3(p.x, 0.0, p.z)
+
+func get_grid_extent() -> float:
+	return 6.5

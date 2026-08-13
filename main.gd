@@ -21,6 +21,7 @@ var tool_params_panel: ToolParamsPanel
 var current_tool := "none"
 
 func _ready() -> void:
+	_apply_antialiasing()
 	_build_environment()
 
 	world = WorldStore.new()
@@ -49,7 +50,7 @@ func _ready() -> void:
 	add_child(camera_rig)
 	camera_rig.setup()
 	ground_terrain.set_camera(camera_rig)
-	ground_grid.set_camera(camera_rig)
+	process_physics_priority = 20
 
 	hud = Hud.new()
 	hud.name = "Hud"
@@ -278,6 +279,19 @@ func _build_ground() -> StaticBody3D:
 	add_child(ground)
 	return ground
 
+## Forward+：4x MSAA 3D + TAA（俯视正交由 CameraController 关闭 TAA 以免拖影）。
+## 2x MSAA 2D 照顾 UI 文字/图标。运行时写 Viewport，编辑器 Play 立即生效。
+func _apply_antialiasing() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	vp.msaa_3d = Viewport.MSAA_4X
+	vp.msaa_2d = Viewport.MSAA_2X
+	vp.use_taa = true
+	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
+	vp.use_debanding = true
+
+
 func _build_environment() -> void:
 	var env := Environment.new()
 	var sky := Sky.new()
@@ -371,3 +385,38 @@ func _set_tool(t: String) -> void:
 	builder.set_tool("column" if t == "column" else "device" if t == "device" else "none")
 	hotbar.set_state(t)
 	sync_param_bar()
+	if not _is_placement_tool(t):
+		ground_grid.set_patch_visible(false)
+
+func _is_placement_tool(t: String) -> bool:
+	return t == "column" or t == "wall" or t == "floor_tile" or t == "device"
+
+## 放置工具激活且有有效瞄准时，把局部网格贴在物体脚点下；否则立刻隐藏。
+func _physics_process(_delta: float) -> void:
+	_sync_placement_grid()
+
+func _sync_placement_grid() -> void:
+	if ground_grid == null:
+		return
+	if is_any_dialog_open() or not _is_placement_tool(current_tool):
+		ground_grid.set_patch_visible(false)
+		return
+	var origin: Variant = null
+	var extent := 6.5
+	match current_tool:
+		"column", "device":
+			origin = builder.get_grid_origin()
+			extent = builder.get_grid_extent()
+		"wall":
+			origin = wall_tool.get_grid_origin()
+			extent = wall_tool.get_grid_extent()
+		"floor_tile":
+			origin = floor_tile_tool.get_grid_origin()
+			extent = floor_tile_tool.get_grid_extent()
+	if origin == null:
+		ground_grid.set_patch_visible(false)
+		return
+	var p: Vector3 = origin
+	ground_grid.set_origin(p)
+	ground_grid.set_patch_size(extent)
+	ground_grid.set_patch_visible(true)

@@ -13,6 +13,11 @@ const HL_PAD_HOVER := 0.03
 const HL_PAD_SELECTED := 0.05
 const HL_EMISSION_HOVER := 1.0
 const HL_EMISSION_SELECTED := 1.8
+## 底边相对几何底面抬高：先抵消构件 EMBED 埋地，再高出支撑面约 1.6cm，
+## 避免倒挤外壳底面被泥土/地面挡住。
+const HL_BOTTOM_CLEAR := 0.016
+const HL_EDGE_HOVER := 0.014
+const HL_EDGE_SELECTED := 0.022
 
 var world: WorldStore
 var camera_rig: CameraController
@@ -91,7 +96,8 @@ func _make_outline_mat(emission_energy: float) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	m.albedo_color = Config.COLOR_ACCENT
-	m.cull_mode = BaseMaterial3D.CULL_FRONT
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	m.emission_enabled = true
 	m.emission = Config.COLOR_ACCENT
 	m.emission_energy_multiplier = emission_energy
@@ -217,20 +223,57 @@ func _clear_selected_highlight_only() -> void:
 	_selected_mis.clear()
 
 func _apply_highlight(body: StaticBody3D, pad: float, emission: float, out: Array) -> void:
+	# AABB 12 棱描边（非倒挤外壳）：底 4 棱抬到地面之上，薄板/埋地柱墙也能看见一圈底边。
+	var edge := HL_EDGE_SELECTED if pad >= HL_PAD_SELECTED - 0.001 else HL_EDGE_HOVER
+	var mat := _make_outline_mat(emission)
 	for child in body.get_children():
 		if String(child.name) == HL_NAME:
 			continue
 		if child is MeshInstance3D and child.mesh is BoxMesh:
 			var src: MeshInstance3D = child
-			var outline := MeshInstance3D.new()
-			outline.name = HL_NAME
-			var bm := BoxMesh.new()
-			bm.size = (src.mesh as BoxMesh).size + Vector3.ONE * pad
-			outline.mesh = bm
-			outline.rotation = src.rotation
-			outline.material_override = _make_outline_mat(emission)
-			body.add_child(outline)
-			out.append(outline)
+			var root := Node3D.new()
+			root.name = HL_NAME
+			root.rotation = src.rotation
+			root.position = src.position
+			var size: Vector3 = (src.mesh as BoxMesh).size
+			for spec in _outline_edge_specs(size, pad, edge):
+				var mi := MeshInstance3D.new()
+				var bm := BoxMesh.new()
+				bm.size = spec[1]
+				mi.mesh = bm
+				mi.position = spec[0]
+				mi.material_override = mat
+				mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				root.add_child(mi)
+			body.add_child(root)
+			out.append(root)
+
+
+func _outline_edge_specs(size: Vector3, pad: float, edge: float) -> Array:
+	var hx := size.x * 0.5 + pad * 0.5
+	var hz := size.z * 0.5 + pad * 0.5
+	var y_top := size.y * 0.5 + pad * 0.5
+	var y_bot := -size.y * 0.5 + Config.EMBED + HL_BOTTOM_CLEAR
+	if y_bot > y_top - edge:
+		y_bot = y_top - edge
+	var y_mid := (y_bot + y_top) * 0.5
+	var h := maxf(y_top - y_bot, edge)
+	var lx := hx * 2.0
+	var lz := hz * 2.0
+	return [
+		[Vector3(0.0, y_bot, -hz), Vector3(lx, edge, edge)],
+		[Vector3(0.0, y_bot, hz), Vector3(lx, edge, edge)],
+		[Vector3(-hx, y_bot, 0.0), Vector3(edge, edge, lz)],
+		[Vector3(hx, y_bot, 0.0), Vector3(edge, edge, lz)],
+		[Vector3(0.0, y_top, -hz), Vector3(lx, edge, edge)],
+		[Vector3(0.0, y_top, hz), Vector3(lx, edge, edge)],
+		[Vector3(-hx, y_top, 0.0), Vector3(edge, edge, lz)],
+		[Vector3(hx, y_top, 0.0), Vector3(edge, edge, lz)],
+		[Vector3(-hx, y_mid, -hz), Vector3(edge, h, edge)],
+		[Vector3(hx, y_mid, -hz), Vector3(edge, h, edge)],
+		[Vector3(-hx, y_mid, hz), Vector3(edge, h, edge)],
+		[Vector3(hx, y_mid, hz), Vector3(edge, h, edge)],
+	]
 
 func _is_interactable(body: Object) -> bool:
 	return body != null and body is StaticBody3D and body.has_meta("kind") \
