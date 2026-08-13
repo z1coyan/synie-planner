@@ -9,6 +9,13 @@ var current := 0
 
 func setup() -> void:
 	devices = [
+		{
+			"id": PunchMeshMachineParams.ID,
+			"name": PunchMeshMachineParams.DISPLAY_NAME,
+			"size": PunchMeshMachineParams.FOOTPRINT,
+			"color": PunchMeshMachineParams.COLOR_BODY,
+			"category": PunchMeshMachineParams.CATEGORY,
+		},
 		{"name": "注塑机", "size": Vector3(6.0, 3.0, 2.5), "color": Color(0.88, 0.89, 0.90), "category": "成型设备"},
 		{"name": "空压机", "size": Vector3(3.0, 2.0, 2.0), "color": Color(0.80, 0.81, 0.83), "category": "动力设备"},
 		{"name": "输送带", "size": Vector3(4.0, 1.2, 1.0), "color": Color(0.75, 0.76, 0.78), "category": "输送设备"},

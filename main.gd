@@ -43,6 +43,7 @@ func _ready() -> void:
 
 	library = ElementLibrary.new()
 	library.setup()
+	_spawn_punch_mesh_preview()
 
 	camera_rig = CameraController.new()
 	camera_rig.name = "CameraRig"
@@ -356,6 +357,20 @@ func _unhandled_input(event: InputEvent) -> void:
 				world.toggle_labels()
 				hud.set_status("设备标签：%s" % ("开" if world.labels_visible else "关"))
 				get_viewport().set_input_as_handled()
+
+## 样机预览：在原点附近放一台冲网机，便于对照 1.7 m 视角看真实 2.2 m 柜体。
+func _spawn_punch_mesh_preview() -> void:
+	var fp := PunchMeshMachineParams.FOOTPRINT
+	var cx := Vector3(3.5, Config.FLOOR_TOP_OFFSET + fp.y * 0.5, 4.0)
+	var sample := world.place_box(
+		cx, fp, PunchMeshMachineParams.COLOR_BODY, "device", 0.0, 0,
+		PunchMeshMachineParams.DISPLAY_NAME,
+	)
+	sample.set_meta("preview", true)
+	var label: Label3D = sample.get_node_or_null("Label")
+	if label != null:
+		label.text = "冲网机（预览）"
+
 
 func _set_tool(t: String) -> void:
 	if is_any_dialog_open():
