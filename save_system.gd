@@ -10,10 +10,12 @@ const SAVE_VERSION := 1
 
 var world: WorldStore
 var player: Player
+var library: ElementLibrary  # 用户自定义设备类型库（可空，空则不入档）
 
-func setup(w: WorldStore, p: Player) -> void:
+func setup(w: WorldStore, p: Player, l: ElementLibrary = null) -> void:
 	world = w
 	player = p
+	library = l
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_ensure_dir()
 
@@ -50,6 +52,45 @@ func list_saves() -> Array:
 		return int(a["mtime"]) > int(b["mtime"]))
 	return out
 
+## 原子写入：先写 path+".tmp"，成功后才替换目标文件。
+## 成功返回空字符串，失败返回中文错误。
+static func write_json_atomic(path: String, text: String) -> String:
+	var tmp_path := path + ".tmp"
+	# 1) 写临时文件；失败清理可能残留的 tmp 并返回错误
+	var f := FileAccess.open(tmp_path, FileAccess.WRITE)
+	if f == null:
+		if FileAccess.file_exists(tmp_path):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path(tmp_path))
+		return "无法写入存档"
+	f.store_string(text)
+	f.close()
+	var abs_tmp := ProjectSettings.globalize_path(tmp_path)
+	var abs_path := ProjectSettings.globalize_path(path)
+	# 2) 目标已存在则先删除（Windows 下 rename 无法覆盖已存在文件）。
+	#    只有 tmp 写成功后才动旧档，避免写失败时丢失旧档。
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(abs_path)
+	# 3) 原子重命名替换
+	if DirAccess.rename_absolute(abs_tmp, abs_path) == OK:
+		return ""
+	# 4) 兜底：读 tmp 写回 path，再删 tmp；仍失败则清理并返回错误
+	var fb := FileAccess.open(path, FileAccess.WRITE)
+	var tf := FileAccess.open(tmp_path, FileAccess.READ)
+	if fb == null or tf == null:
+		if fb != null:
+			fb.close()
+		if tf != null:
+			tf.close()
+		if FileAccess.file_exists(tmp_path):
+			DirAccess.remove_absolute(abs_tmp)
+		return "无法写入存档"
+	fb.store_string(tf.get_as_text())
+	tf.close()
+	fb.close()
+	if FileAccess.file_exists(tmp_path):
+		DirAccess.remove_absolute(abs_tmp)
+	return ""
+
 ## 成功返回空字符串，失败返回中文错误。
 func save_game(raw_name: String) -> String:
 	if world == null:
@@ -64,13 +105,12 @@ func save_game(raw_name: String) -> String:
 		"player": _serialize_player(),
 		"objects": world.serialize_placed(),
 		"labels_visible": world.labels_visible,
+		"library": library.serialize() if library != null else [],
 	}
 	var json := JSON.stringify(data, "\t")
-	var f := FileAccess.open(path, FileAccess.WRITE)
-	if f == null:
-		return "无法写入存档"
-	f.store_string(json)
-	f.close()
+	var err := write_json_atomic(path, json)
+	if err != "":
+		return err
 	world.dirty = false
 	return ""
 
@@ -88,6 +128,10 @@ func load_game(path: String) -> String:
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return "存档格式无效"
 	var data: Dictionary = parsed
+	# 版本检查：版本缺失按 1 处理；比当前新则拒绝读取，不改现有世界、不置 dirty
+	var ver := int(data.get("version", 1))
+	if ver > SAVE_VERSION:
+		return "存档版本过新，无法读取"
 	var objs: Array = data.get("objects", [])
 	world.restore_placed(objs)
 	if data.has("labels_visible"):
@@ -95,6 +139,10 @@ func load_game(path: String) -> String:
 		if world.labels_visible != want:
 			world.toggle_labels()
 	_apply_player(data.get("player", {}))
+	# 设备库恢复：缺失或非法不影响其余加载流程
+	var lib_data: Variant = data.get("library")
+	if library != null and lib_data is Array:
+		library.restore(lib_data)
 	world.dirty = false
 	world_reset.emit()
 	return ""

@@ -1,0 +1,1549 @@
+{
+  "initialize": {
+    "protocolVersion": "2024-11-05",
+    "capabilities": {
+      "experimental": {},
+      "logging": {},
+      "prompts": {
+        "listChanged": true
+      },
+      "resources": {
+        "subscribe": false,
+        "listChanged": true
+      },
+      "tools": {
+        "listChanged": true
+      },
+      "extensions": {
+        "io.modelcontextprotocol/ui": {}
+      }
+    },
+    "serverInfo": {
+      "name": "Godot AI",
+      "version": "3.4.7"
+    },
+    "instructions": "Production-grade Godot MCP server with persistent editor integration.\n\nTool surface — 19 named verbs + per-domain `<domain>_manage` rollups:\n\nCore named verbs (always loaded — common reads + high-traffic writes):\n  editor_state                      — readiness, version, current scene\n  scene_get_hierarchy               — paginated scene tree walk\n  node_get_properties               — full property snapshot\n  session_activate                  — pin commands to one editor\n  node_create / node_set_property / node_find\n  scene_open / scene_save\n  script_create / script_attach / script_patch\n  project_run, test_run, batch_execute, logs_read\n  editor_screenshot, editor_reload_plugin, animation_create\n\nDomain rollups (one tool per domain; pass `op=` + a `params` dict):\n  scene_manage     create, save_as, get_roots\n  node_manage      get_children, get_groups, delete, duplicate, rename,\n                   move, reparent, add_to_group, remove_from_group\n  script_manage    read, detach, find_symbols\n  project_manage   stop, settings_get, settings_set\n  editor_manage    state, selection_get/set, monitors_get, quit, logs_clear,\n                   game_eval\n  session_manage   list\n  test_manage      results_get\n  animation_manage player_create, delete, validate, add_property_track,\n                   add_method_track, set_autoplay, play, stop, list, get,\n                   create_simple, preset_fade/slide/shake/pulse\n  material_manage  create, set_param, set_shader_param, get, list, assign,\n                   apply_to_node, apply_preset\n  audio_manage     player_create, player_set_stream, player_set_playback,\n                   play, stop, list\n  particle_manage  create, set_main, set_process, set_draw_pass, restart,\n                   get, apply_preset\n  camera_manage    create, configure, set_limits_2d, set_damping_2d,\n                   follow_2d, get, list, apply_preset\n  signal_manage    list, connect, disconnect\n  input_map_manage list, add_action, ensure_action, remove_action,\n                   bind_event, ensure_binding\n  game_manage      get_scene_tree, get_node_info, get_ui_elements,\n                   input_key, input_mouse, input_gamepad, input_action,\n                   input_state\n  autoload_manage  list, add, remove\n  filesystem_manage read_text, write_text, reimport, scan, search\n  theme_manage     create, set_color, set_constant, set_font_size,\n                   set_stylebox_flat, apply\n  ui_manage        set_anchor_preset, set_text, build_layout, draw_recipe\n  resource_manage  search, load, assign, get_info, create,\n                   curve_set_points, environment_create,\n                   physics_shape_autofit, gradient_texture_create,\n                   noise_texture_create\n  api_manage       get_class\n  client_manage    status, configure, remove\n\n  tilemap_manage   tilemap_set_cell, tilemap_set_cells_rect,\n                   tilemap_clear, tilemap_get_cells\n  tileset_manage   tileset_get_atlas_tiles, tileset_get_atlas_image\n  gridmap_manage   gridmap_set_item, gridmap_fill, gridmap_clear,\n                   gridmap_get_used_cells, gridmap_list_library_items\n  csg_manage       csg_create, csg_set_operation\n\nResources (read-only URIs, no tool-count cost — prefer for active-session reads when the client surfaces them):\n  godot://sessions, godot://editor/state, godot://selection/current,\n  godot://logs/recent, godot://scene/current, godot://scene/hierarchy,\n  godot://node/{path}/properties|children|groups,\n  godot://class/{class_name},\n  godot://script/{path}, godot://project/info, godot://project/settings,\n  godot://materials, godot://input_map, godot://performance,\n  godot://test/results\n\nAlways connect to an editor session first (session_activate or session_manage(op=\"list\")). Write operations require session readiness; check editor_state if a call is rejected as 'not writable'. After driving a running game, check logs_read(source='editor' or 'game', include_details=true) before declaring a feature verified."
+  },
+  "stop_before": {
+    "reason": "Project was not running; no action taken",
+    "stopped": true,
+    "undoable": false,
+    "was_running": false,
+    "new_errors_since_last_call": 4,
+    "new_errors_hint": "4 new GDScript errors since your last call. If you are mid-way through a planned multi-file scaffold, finish the related writes and run filesystem_manage(op=\"scan\") before debugging; otherwise inspect with logs_read(source='editor'|'game', include_details=true)."
+  },
+  "scan": {
+    "global_class_count": 70,
+    "global_classes_registered_delta": 2,
+    "reason": "Filesystem scan is an editor operation",
+    "scan_completed": true,
+    "scan_settle": "settled",
+    "undoable": false,
+    "was_already_scanning": false
+  },
+  "logs_clear": {
+    "_text": "1 validation error for call[editor_manage]\nop\n  Missing required argument [type=missing_argument, input_value={'params': {'action': 'logs_clear'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing_argument"
+  },
+  "project_run": {
+    "autosave": true,
+    "current_run_errors": [],
+    "game_status": {
+      "active": true,
+      "editor_log_cursor": 43,
+      "elapsed_msec": 993,
+      "helper_expected": true,
+      "helper_live": true,
+      "ready": true,
+      "ready_wait_msec": 3000,
+      "run_started_msec": 43825755,
+      "run_token": 24,
+      "session_active": true,
+      "status": "live"
+    },
+    "helper_live": true,
+    "mode": "main",
+    "reason": "Game launched and the Godot AI game helper is live.",
+    "recent_errors": [],
+    "recent_errors_may_predate_run": false,
+    "recent_errors_scope": "none",
+    "recent_errors_truncated": false,
+    "retained_errors": [],
+    "scene": "",
+    "session_active": true,
+    "undoable": false,
+    "was_already_running": false
+  },
+  "logs_read_editor": {
+    "source": "editor",
+    "lines": [
+      {
+        "details": {
+          "code": "Condition \"err\" is true. Returning: err",
+          "error_type": 0,
+          "error_type_name": "error",
+          "frames": [],
+          "message": "Attempt to open script 'res://floor_manager.gd' resulted in error 'File not found'.",
+          "rationale": "Attempt to open script 'res://floor_manager.gd' resulted in error 'File not found'.",
+          "resolved": {
+            "function": "load_source_code",
+            "line": 0,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "load_source_code",
+            "line": 1139,
+            "path": "modules/gdscript/gdscript.cpp"
+          }
+        },
+        "function": "load_source_code",
+        "level": "error",
+        "line": 0,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Attempt to open script 'res://floor_manager.gd' resulted in error 'File not found'."
+      },
+      {
+        "details": {
+          "code": "Failed to load script \"res://floor_manager.gd\" with error \"File not found\".",
+          "error_type": 0,
+          "error_type_name": "error",
+          "frames": [],
+          "message": "Failed to load script \"res://floor_manager.gd\" with error \"File not found\".",
+          "rationale": "",
+          "resolved": {
+            "function": "load",
+            "line": 0,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "load",
+            "line": 46,
+            "path": "modules/gdscript/gdscript_resource_format.cpp"
+          }
+        },
+        "function": "load",
+        "level": "error",
+        "line": 0,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Failed to load script \"res://floor_manager.gd\" with error \"File not found\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 26,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 26,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 26,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_HEIGHT\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_HEIGHT\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 45,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 45,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 45,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_HEIGHT\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_HEIGHT\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_HEIGHT\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 51,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 51,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 51,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_HEIGHT\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 51,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 51,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 51,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 57,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 57,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 57,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 81,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 81,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 81,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 90,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 90,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 90,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot infer the type of \"hw\" variable because the value doesn't have a set type.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot infer the type of \"hw\" variable because the value doesn't have a set type.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 90,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 90,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 90,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot infer the type of \"hw\" variable because the value doesn't have a set type."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 91,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 91,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 91,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot infer the type of \"hd\" variable because the value doesn't have a set type.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot infer the type of \"hd\" variable because the value doesn't have a set type.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 91,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 91,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 91,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot infer the type of \"hd\" variable because the value doesn't have a set type."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 109,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 109,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 109,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 109,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 109,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 109,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"SLAB_CELL\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"SLAB_CELL\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 134,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 134,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 134,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"SLAB_CELL\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot infer the type of \"cell\" variable because the value doesn't have a set type.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot infer the type of \"cell\" variable because the value doesn't have a set type.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 134,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 134,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 134,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot infer the type of \"cell\" variable because the value doesn't have a set type."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 135,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 135,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 135,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 136,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 136,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 136,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_SIZE\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot infer the type of \"x0\" variable because the value doesn't have a set type.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot infer the type of \"x0\" variable because the value doesn't have a set type.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 143,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 143,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 143,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot infer the type of \"x0\" variable because the value doesn't have a set type."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot infer the type of \"z0\" variable because the value doesn't have a set type.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot infer the type of \"z0\" variable because the value doesn't have a set type.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 144,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 144,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 144,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot infer the type of \"z0\" variable because the value doesn't have a set type."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot infer the type of \"x1\" variable because the value doesn't have a set type.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot infer the type of \"x1\" variable because the value doesn't have a set type.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 145,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 145,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 145,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot infer the type of \"x1\" variable because the value doesn't have a set type."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot infer the type of \"z1\" variable because the value doesn't have a set type.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot infer the type of \"z1\" variable because the value doesn't have a set type.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 146,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 146,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 146,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot infer the type of \"z1\" variable because the value doesn't have a set type."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 249,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 249,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 249,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot find member \"FLOOR_COUNT\" in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Cannot infer the type of \"vis\" variable because the value doesn't have a set type.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Cannot infer the type of \"vis\" variable because the value doesn't have a set type.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 250,
+            "path": "res://floor_manager.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 250,
+            "path": "res://floor_manager.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 250,
+        "path": "res://floor_manager.gd",
+        "source": "editor",
+        "text": "Parse Error: Cannot infer the type of \"vis\" variable because the value doesn't have a set type."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Could not find type \"FloorTileTool\" in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Could not find type \"FloorTileTool\" in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 7,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 7,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 7,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Could not find type \"FloorTileTool\" in the current scope."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Could not find type \"GroundGrid\" in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Could not find type \"GroundGrid\" in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 10,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 10,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 10,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Could not find type \"GroundGrid\" in the current scope."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Identifier \"GroundGrid\" not declared in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Identifier \"GroundGrid\" not declared in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 29,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 29,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 29,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Identifier \"GroundGrid\" not declared in the current scope."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Identifier \"FloorTileTool\" not declared in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Identifier \"FloorTileTool\" not declared in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 63,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 63,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 63,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Identifier \"FloorTileTool\" not declared in the current scope."
+      },
+      {
+        "details": {
+          "code": "Failed to load script \"res://main.gd\" with error \"Parse error\".",
+          "error_type": 0,
+          "error_type_name": "error",
+          "frames": [],
+          "message": "Failed to load script \"res://main.gd\" with error \"Parse error\".",
+          "rationale": "",
+          "resolved": {
+            "function": "load",
+            "line": 0,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "load",
+            "line": 46,
+            "path": "modules/gdscript/gdscript_resource_format.cpp"
+          }
+        },
+        "function": "load",
+        "level": "error",
+        "line": 0,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Failed to load script \"res://main.gd\" with error \"Parse error\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Could not find type \"FloorTileTool\" in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Could not find type \"FloorTileTool\" in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 7,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 7,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 7,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Could not find type \"FloorTileTool\" in the current scope."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Could not find type \"GroundGrid\" in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Could not find type \"GroundGrid\" in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 10,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 10,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 10,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Could not find type \"GroundGrid\" in the current scope."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Identifier \"GroundGrid\" not declared in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Identifier \"GroundGrid\" not declared in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 29,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 29,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 29,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Identifier \"GroundGrid\" not declared in the current scope."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Identifier \"FloorTileTool\" not declared in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Identifier \"FloorTileTool\" not declared in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 63,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 63,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 63,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Identifier \"FloorTileTool\" not declared in the current scope."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Could not find type \"SelectTool\" in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Could not find type \"SelectTool\" in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 13,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 13,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 13,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Could not find type \"SelectTool\" in the current scope."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Identifier \"SelectTool\" not declared in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Identifier \"SelectTool\" not declared in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 75,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 75,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 75,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Identifier \"SelectTool\" not declared in the current scope."
+      },
+      {
+        "details": {
+          "code": "Failed to load script \"res://main.gd\" with error \"Parse error\".",
+          "error_type": 0,
+          "error_type_name": "error",
+          "frames": [],
+          "message": "Failed to load script \"res://main.gd\" with error \"Parse error\".",
+          "rationale": "",
+          "resolved": {
+            "function": "load",
+            "line": 0,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "load",
+            "line": 46,
+            "path": "modules/gdscript/gdscript_resource_format.cpp"
+          }
+        },
+        "function": "load",
+        "level": "error",
+        "line": 0,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Failed to load script \"res://main.gd\" with error \"Parse error\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Could not find type \"SelectTool\" in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Could not find type \"SelectTool\" in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 13,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 13,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 13,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Could not find type \"SelectTool\" in the current scope."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Identifier \"SelectTool\" not declared in the current scope.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Identifier \"SelectTool\" not declared in the current scope.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 75,
+            "path": "res://main.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 75,
+            "path": "res://main.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 75,
+        "path": "res://main.gd",
+        "source": "editor",
+        "text": "Parse Error: Identifier \"SelectTool\" not declared in the current scope."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Function \"accept_event()\" not found in base self.",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Function \"accept_event()\" not found in base self.",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 137,
+            "path": "res://hotbar.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 137,
+            "path": "res://hotbar.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 137,
+        "path": "res://hotbar.gd",
+        "source": "editor",
+        "text": "Parse Error: Function \"accept_event()\" not found in base self."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Static function \"normalize_material()\" not found in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Static function \"normalize_material()\" not found in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 121,
+            "path": "res://param_bar.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 121,
+            "path": "res://param_bar.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 121,
+        "path": "res://param_bar.gd",
+        "source": "editor",
+        "text": "Parse Error: Static function \"normalize_material()\" not found in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Static function \"normalize_material()\" not found in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Static function \"normalize_material()\" not found in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 152,
+            "path": "res://param_bar.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 152,
+            "path": "res://param_bar.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 152,
+        "path": "res://param_bar.gd",
+        "source": "editor",
+        "text": "Parse Error: Static function \"normalize_material()\" not found in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Parse Error: Static function \"material_label()\" not found in base \"Config\".",
+          "error_type": 2,
+          "error_type_name": "script",
+          "frames": [],
+          "message": "Parse Error: Static function \"material_label()\" not found in base \"Config\".",
+          "rationale": "",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 156,
+            "path": "res://param_bar.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 156,
+            "path": "res://param_bar.gd"
+          }
+        },
+        "function": "GDScript::reload",
+        "level": "error",
+        "line": 156,
+        "path": "res://param_bar.gd",
+        "source": "editor",
+        "text": "Parse Error: Static function \"material_label()\" not found in base \"Config\"."
+      },
+      {
+        "details": {
+          "code": "Failed to load script \"res://param_bar.gd\" with error \"Parse error\".",
+          "error_type": 0,
+          "error_type_name": "error",
+          "frames": [],
+          "message": "Failed to load script \"res://param_bar.gd\" with error \"Parse error\".",
+          "rationale": "",
+          "resolved": {
+            "function": "load",
+            "line": 0,
+            "path": "res://param_bar.gd"
+          },
+          "source": {
+            "function": "load",
+            "line": 46,
+            "path": "modules/gdscript/gdscript_resource_format.cpp"
+          }
+        },
+        "function": "load",
+        "level": "error",
+        "line": 0,
+        "path": "res://param_bar.gd",
+        "source": "editor",
+        "text": "Failed to load script \"res://param_bar.gd\" with error \"Parse error\"."
+      },
+      {
+        "details": {
+          "children": [
+            {
+              "label": "<GDScript 错误>",
+              "line": 17,
+              "path": "res://world_store.gd",
+              "text": "SHADOWED_GLOBAL_IDENTIFIER"
+            },
+            {
+              "label": "<GDScript 源文件>",
+              "line": 17,
+              "path": "res://world_store.gd",
+              "text": "world_store.gd:17 @ GDScript::reload()"
+            }
+          ],
+          "debugger_tab": "Errors",
+          "error_type_name": "warning",
+          "frames": [],
+          "message": "GDScript::reload: The function parameter \"floor\" has the same name as a built-in function.",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 17,
+            "path": "res://world_store.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 17,
+            "path": "res://world_store.gd"
+          },
+          "time": "0:00:00:576"
+        },
+        "function": "GDScript::reload",
+        "level": "warn",
+        "line": 17,
+        "path": "res://world_store.gd",
+        "source": "editor",
+        "text": "GDScript::reload: The function parameter \"floor\" has the same name as a built-in function."
+      },
+      {
+        "details": {
+          "children": [
+            {
+              "label": "<GDScript 错误>",
+              "line": 17,
+              "path": "res://world_store.gd",
+              "text": "SHADOWED_VARIABLE_BASE_CLASS"
+            },
+            {
+              "label": "<GDScript 源文件>",
+              "line": 17,
+              "path": "res://world_store.gd",
+              "text": "world_store.gd:17 @ GDScript::reload()"
+            }
+          ],
+          "debugger_tab": "Errors",
+          "error_type_name": "warning",
+          "frames": [],
+          "message": "GDScript::reload: The local function parameter \"name\" is shadowing an already-declared property in the base class \"Node\".",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 17,
+            "path": "res://world_store.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 17,
+            "path": "res://world_store.gd"
+          },
+          "time": "0:00:00:576"
+        },
+        "function": "GDScript::reload",
+        "level": "warn",
+        "line": 17,
+        "path": "res://world_store.gd",
+        "source": "editor",
+        "text": "GDScript::reload: The local function parameter \"name\" is shadowing an already-declared property in the base class \"Node\"."
+      },
+      {
+        "details": {
+          "children": [
+            {
+              "label": "<GDScript 错误>",
+              "line": 26,
+              "path": "res://camera_controller.gd",
+              "text": "SHADOWED_VARIABLE"
+            },
+            {
+              "label": "<GDScript 源文件>",
+              "line": 26,
+              "path": "res://camera_controller.gd",
+              "text": "camera_controller.gd:26 @ GDScript::reload()"
+            }
+          ],
+          "debugger_tab": "Errors",
+          "error_type_name": "warning",
+          "frames": [],
+          "message": "GDScript::reload: The local function parameter \"yaw\" is shadowing an already-declared variable at line 11 in the current class.",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 26,
+            "path": "res://camera_controller.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 26,
+            "path": "res://camera_controller.gd"
+          },
+          "time": "0:00:00:582"
+        },
+        "function": "GDScript::reload",
+        "level": "warn",
+        "line": 26,
+        "path": "res://camera_controller.gd",
+        "source": "editor",
+        "text": "GDScript::reload: The local function parameter \"yaw\" is shadowing an already-declared variable at line 11 in the current class."
+      },
+      {
+        "details": {
+          "children": [
+            {
+              "label": "<GDScript 错误>",
+              "line": 193,
+              "path": "res://builder.gd",
+              "text": "UNUSED_VARIABLE"
+            },
+            {
+              "label": "<GDScript 源文件>",
+              "line": 193,
+              "path": "res://builder.gd",
+              "text": "builder.gd:193 @ GDScript::reload()"
+            }
+          ],
+          "debugger_tab": "Errors",
+          "error_type_name": "warning",
+          "frames": [],
+          "message": "GDScript::reload: The local variable \"name_map\" is declared but never used in the block. If this is intended, prefix it with an underscore: \"_name_map\".",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 193,
+            "path": "res://builder.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 193,
+            "path": "res://builder.gd"
+          },
+          "time": "0:00:00:590"
+        },
+        "function": "GDScript::reload",
+        "level": "warn",
+        "line": 193,
+        "path": "res://builder.gd",
+        "source": "editor",
+        "text": "GDScript::reload: The local variable \"name_map\" is declared but never used in the block. If this is intended, prefix it with an underscore: \"_name_map\"."
+      },
+      {
+        "details": {
+          "children": [
+            {
+              "label": "<GDScript 错误>",
+              "line": 125,
+              "path": "res://wall_tool.gd",
+              "text": "SHADOWED_GLOBAL_IDENTIFIER"
+            },
+            {
+              "label": "<GDScript 源文件>",
+              "line": 125,
+              "path": "res://wall_tool.gd",
+              "text": "wall_tool.gd:125 @ GDScript::reload()"
+            }
+          ],
+          "debugger_tab": "Errors",
+          "error_type_name": "warning",
+          "frames": [],
+          "message": "GDScript::reload: The variable \"snapped\" has the same name as a built-in function.",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 125,
+            "path": "res://wall_tool.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 125,
+            "path": "res://wall_tool.gd"
+          },
+          "time": "0:00:00:595"
+        },
+        "function": "GDScript::reload",
+        "level": "warn",
+        "line": 125,
+        "path": "res://wall_tool.gd",
+        "source": "editor",
+        "text": "GDScript::reload: The variable \"snapped\" has the same name as a built-in function."
+      },
+      {
+        "details": {
+          "children": [
+            {
+              "label": "<GDScript 错误>",
+              "line": 236,
+              "path": "res://wall_tool.gd",
+              "text": "SHADOWED_GLOBAL_IDENTIFIER"
+            },
+            {
+              "label": "<GDScript 源文件>",
+              "line": 236,
+              "path": "res://wall_tool.gd",
+              "text": "wall_tool.gd:236 @ GDScript::reload()"
+            }
+          ],
+          "debugger_tab": "Errors",
+          "error_type_name": "warning",
+          "frames": [],
+          "message": "GDScript::reload: The variable \"snapped\" has the same name as a built-in function.",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 236,
+            "path": "res://wall_tool.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 236,
+            "path": "res://wall_tool.gd"
+          },
+          "time": "0:00:00:595"
+        },
+        "function": "GDScript::reload",
+        "level": "warn",
+        "line": 236,
+        "path": "res://wall_tool.gd",
+        "source": "editor",
+        "text": "GDScript::reload: The variable \"snapped\" has the same name as a built-in function."
+      },
+      {
+        "details": {
+          "children": [
+            {
+              "label": "<GDScript 错误>",
+              "line": 9,
+              "path": "res://ui_icons.gd",
+              "text": "UNUSED_PARAMETER"
+            },
+            {
+              "label": "<GDScript 源文件>",
+              "line": 9,
+              "path": "res://ui_icons.gd",
+              "text": "ui_icons.gd:9 @ GDScript::reload()"
+            }
+          ],
+          "debugger_tab": "Errors",
+          "error_type_name": "warning",
+          "frames": [],
+          "message": "GDScript::reload: The parameter \"param\" is never used in the function \"draw()\". If this is intended, prefix it with an underscore: \"_param\".",
+          "resolved": {
+            "function": "GDScript::reload",
+            "line": 9,
+            "path": "res://ui_icons.gd"
+          },
+          "source": {
+            "function": "GDScript::reload",
+            "line": 9,
+            "path": "res://ui_icons.gd"
+          },
+          "time": "0:00:00:621"
+        },
+        "function": "GDScript::reload",
+        "level": "warn",
+        "line": 9,
+        "path": "res://ui_icons.gd",
+        "source": "editor",
+        "text": "GDScript::reload: The parameter \"param\" is never used in the function \"draw()\". If this is intended, prefix it with an underscore: \"_param\"."
+      }
+    ],
+    "total_count": 54,
+    "returned_count": 50,
+    "offset": 0,
+    "limit": 50,
+    "has_more": true,
+    "run_id": "",
+    "is_running": false,
+    "dropped_count": 0,
+    "stale_run_id": false,
+    "next_cursor": 43,
+    "appended_total": 43
+  },
+  "logs_read_game": {
+    "source": "game",
+    "lines": [
+      {
+        "level": "info",
+        "run_id": "r43825756-24",
+        "source": "game",
+        "text": "[godot_ai game_helper] registered mcp capture (debugger active=true, logger=true)\n"
+      }
+    ],
+    "total_count": 1,
+    "returned_count": 1,
+    "offset": 0,
+    "limit": 50,
+    "has_more": false,
+    "run_id": "r43825756-24",
+    "is_running": true,
+    "dropped_count": 0,
+    "stale_run_id": false,
+    "current_run_id": "r43825756-24",
+    "helper_live": true,
+    "session_active": true,
+    "game_status": {
+      "active": true,
+      "editor_log_cursor": 43,
+      "elapsed_msec": 3520,
+      "helper_expected": true,
+      "helper_live": true,
+      "ready": true,
+      "ready_wait_msec": 20000,
+      "run_started_msec": 43825755,
+      "run_token": 24,
+      "session_active": true,
+      "status": "live"
+    }
+  },
+  "editor_state": {
+    "current_scene": "res://main.tscn",
+    "game_capture_ready": true,
+    "game_status": {
+      "active": true,
+      "editor_log_cursor": 43,
+      "elapsed_msec": 3527,
+      "helper_expected": true,
+      "helper_live": true,
+      "ready": true,
+      "ready_wait_msec": 20000,
+      "run_started_msec": 43825755,
+      "run_token": 24,
+      "session_active": true,
+      "status": "live"
+    },
+    "godot_version": "4.7.1-stable (official)",
+    "helper_live": true,
+    "is_playing": true,
+    "project_name": "synie-planner",
+    "readiness": "playing",
+    "session_active": true
+  },
+  "stop": {
+    "readiness_after": "ready",
+    "reason": "Play/stop is a runtime action",
+    "stopped": true,
+    "undoable": false,
+    "was_running": true
+  }
+}

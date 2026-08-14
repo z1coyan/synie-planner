@@ -1,13 +1,10 @@
 class_name SelectTool
-extends Node3D
+extends PlacementToolBase
 
 ## 交互工具（快捷栏「无」）：准星点选已放置物体。
 ## 柱/墙/地板/楼梯选中后由 ParamBar 提供 F1 工具参数 / F2 阵列 / F3 材质。
 ## 设备选中后仅快捷栏 F2 阵列。取消选中用右键或点空白。
 
-const INTERACT_KINDS := ["wall", "column", "device", "floor_tile", "stair"]
-const KIND_NAMES := {"wall": "墙体", "column": "柱子", "device": "设备", "floor_tile": "地板", "stair": "楼梯"}
-const MATERIAL_KINDS := ["wall", "column", "floor_tile", "stair"]
 const HL_NAME := "_SelectHL"
 const HL_PAD_HOVER := 0.03
 const HL_PAD_SELECTED := 0.05
@@ -19,13 +16,8 @@ const HL_BOTTOM_CLEAR := 0.016
 const HL_EDGE_HOVER := 0.014
 const HL_EDGE_SELECTED := 0.022
 
-var world: WorldStore
-var camera_rig: CameraController
-var hud: Hud
 var hotbar: Hotbar
-var host: Node
 
-var active := false
 ## hover | selected | array_dialog | array
 var mode := "hover"
 
@@ -66,35 +58,27 @@ var _array_length := 0.0
 var _array_height := 0.0
 var _array_openings: Array = []
 
-func setup(w: WorldStore, cc: CameraController, h: Hud, hb: Hotbar, main_host: Node = null) -> void:
+func setup(w: WorldStore, cc: CameraController, h: Hud, hb: Hotbar, main_host: Node = null, modal: ModalManager = null) -> void:
 	world = w
 	camera_rig = cc
 	hud = h
 	hotbar = hb
 	host = main_host
+	self.modal = modal
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
 	_array_panel = ArrayPanel.new()
 	_array_panel.name = "ArrayPanel"
 	add_child(_array_panel)
 	_array_panel.setup(camera_rig)
+	if modal != null:
+		modal.register(_array_panel)
 	if not _array_panel.confirmed.is_connected(_on_array_dialog_confirmed):
 		_array_panel.confirmed.connect(_on_array_dialog_confirmed)
 	if not _array_panel.cancelled.is_connected(_cancel_array):
 		_array_panel.cancelled.connect(_cancel_array)
 	if hotbar != null and not hotbar.action_chosen.is_connected(_on_hotbar_action):
 		hotbar.action_chosen.connect(_on_hotbar_action)
-
-func _holo_mat(base: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = base
-	m.emission_enabled = true
-	var e := base
-	e.a = 1.0
-	m.emission = e
-	return m
 
 func _make_outline_mat(emission_energy: float) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
@@ -137,7 +121,7 @@ func is_array_dialog_open() -> bool:
 
 func wants_param_bar() -> bool:
 	return mode == "selected" and is_instance_valid(_selected) \
-			and MATERIAL_KINDS.has(String(_selected.get_meta("kind")))
+			and Kinds.MATERIAL_KINDS.has(String(_selected.get_meta("kind")))
 
 func sync_param_bar(pb: ParamBar) -> void:
 	if not wants_param_bar():
@@ -309,12 +293,12 @@ func _outline_edge_specs(size: Vector3, pad: float, edge: float) -> Array:
 
 func _is_interactable(body: Object) -> bool:
 	return body != null and body is StaticBody3D and body.has_meta("kind") \
-			and INTERACT_KINDS.has(body.get_meta("kind")) and (body as StaticBody3D).collision_layer != 0
+			and Kinds.INTERACT_KINDS.has(body.get_meta("kind")) and (body as StaticBody3D).collision_layer != 0
 
 func _physics_process(_delta: float) -> void:
 	if not active:
 		return
-	if host != null and host.has_method("is_any_dialog_open") and host.is_any_dialog_open():
+	if _dialog_open():
 		return
 	match mode:
 		"hover":
@@ -355,7 +339,7 @@ func _process_selected_aim() -> void:
 	_update_hud()
 
 func _kind_label(body: StaticBody3D) -> String:
-	var kind_name: String = KIND_NAMES.get(body.get_meta("kind"), "物体")
+	var kind_name: String = Kinds.label(body.get_meta("kind"))
 	if body.has_meta("name"):
 		kind_name += "（%s）" % body.get_meta("name")
 	return kind_name
@@ -379,7 +363,7 @@ func _update_hud() -> void:
 				return
 			var size2: Vector3 = _selected.get_meta("size")
 			var kind := String(_selected.get_meta("kind"))
-			if MATERIAL_KINDS.has(kind):
+			if Kinds.MATERIAL_KINDS.has(kind):
 				hud.set_status("已选中：%s — F1 参数 / F2 阵列 / F3 材质" % _kind_label(_selected))
 				hud.set_length("F1 参数 · F2 阵列 · F3 材质 · 右键取消选中")
 			else:
@@ -410,7 +394,7 @@ func _select_body(body: StaticBody3D) -> void:
 	_apply_highlight(_selected, HL_PAD_SELECTED, HL_EMISSION_SELECTED, _selected_mis)
 	mode = "selected"
 	var kind := String(body.get_meta("kind"))
-	if MATERIAL_KINDS.has(kind):
+	if Kinds.MATERIAL_KINDS.has(kind):
 		_show_tool_bar()
 	else:
 		_show_device_action_bar()
@@ -497,7 +481,7 @@ func _cancel_array() -> void:
 	if is_instance_valid(_selected):
 		mode = "selected"
 		var kind := String(_selected.get_meta("kind"))
-		if MATERIAL_KINDS.has(kind):
+		if Kinds.MATERIAL_KINDS.has(kind):
 			_show_tool_bar()
 		else:
 			_show_device_action_bar()
@@ -685,7 +669,7 @@ func _confirm_array() -> void:
 	if is_instance_valid(_selected):
 		mode = "selected"
 		var kind := String(_selected.get_meta("kind"))
-		if MATERIAL_KINDS.has(kind):
+		if Kinds.MATERIAL_KINDS.has(kind):
 			_show_tool_bar()
 		else:
 			_show_device_action_bar()
@@ -709,7 +693,7 @@ func _on_hotbar_action(action_id: String) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not active:
 		return
-	if host != null and host.has_method("is_any_dialog_open") and host.is_any_dialog_open():
+	if _dialog_open():
 		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT and event.pressed:
 			pass
 		return

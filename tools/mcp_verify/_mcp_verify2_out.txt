@@ -1,0 +1,4 @@
+  File "<string>", line 79
+    print(f'poll {i}: helper_live={helper} ready={gs.get(\"ready\") if isinstance(gs,dict) else None} status={gs.get(\"status\") if isinstance(gs,dict) else None}')
+                                                          ^
+SyntaxError: unexpected character after line continuation character

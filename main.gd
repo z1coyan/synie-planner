@@ -23,12 +23,20 @@ var param_bar: ParamBar
 var material_panel: MaterialPanel
 var tool_params_panel: ToolParamsPanel
 var save_system: SaveSystem
+var modal: ModalManager  # 弹窗集中管理器：统一登记各弹窗面板
+var _render: EnvironmentSystem  # 光照/天空/后期渲染系统
 
 var current_tool := "none"
 
+## 放置工具注册表：{id, kind, tool}，按数字键顺序注册。
+## device 复用 builder 的 column 项；delete/none 不注册（各自单独管理）。
+var _registry: Array[Dictionary] = []
+
 func _ready() -> void:
-	_apply_antialiasing()
-	_build_environment()
+	_render = EnvironmentSystem.new()
+	_render.name = "EnvironmentSystem"
+	add_child(_render)
+	_render.setup()
 
 	world = WorldStore.new()
 	world.name = "WorldStore"
@@ -76,12 +84,17 @@ func _ready() -> void:
 	param_bar.setup()
 	param_bar.action_requested.connect(_on_param_action)
 
+	modal = ModalManager.new()
+	modal.name = "ModalManager"
+	add_child(modal)
+
 	material_panel = MaterialPanel.new()
 	material_panel.name = "MaterialPanel"
 	add_child(material_panel)
 	material_panel.setup(camera_rig)
 	material_panel.confirmed.connect(_on_material_confirmed)
 	material_panel.cancelled.connect(_on_material_cancelled)
+	modal.register(material_panel)
 
 	tool_params_panel = ToolParamsPanel.new()
 	tool_params_panel.name = "ToolParamsPanel"
@@ -89,47 +102,55 @@ func _ready() -> void:
 	tool_params_panel.setup(camera_rig)
 	tool_params_panel.confirmed.connect(_on_tool_params_confirmed)
 	tool_params_panel.cancelled.connect(_on_tool_params_cancelled)
+	modal.register(tool_params_panel)
 
 	builder = Builder.new()
 	builder.name = "Builder"
 	add_child(builder)
 	builder.setup(world, camera_rig, hud, library, self)
+	builder.set_modal(modal)
 	builder.exit_requested.connect(_on_tool_exit)
 
 	wall_tool = WallTool.new()
 	wall_tool.name = "WallTool"
 	add_child(wall_tool)
 	wall_tool.setup(world, camera_rig, hud, self)
+	wall_tool.set_modal(modal)
 	wall_tool.exit_requested.connect(_on_tool_exit)
 
 	floor_tile_tool = FloorTileTool.new()
 	floor_tile_tool.name = "FloorTileTool"
 	add_child(floor_tile_tool)
 	floor_tile_tool.setup(world, camera_rig, hud, self)
+	floor_tile_tool.set_modal(modal)
 	floor_tile_tool.exit_requested.connect(_on_tool_exit)
 
 	stair_tool = StairTool.new()
 	stair_tool.name = "StairTool"
 	add_child(stair_tool)
 	stair_tool.setup(world, camera_rig, hud, self)
+	stair_tool.set_modal(modal)
 	stair_tool.exit_requested.connect(_on_tool_exit)
 
 	door_tool = OpeningTool.new()
 	door_tool.name = "DoorTool"
 	add_child(door_tool)
 	door_tool.setup(world, camera_rig, hud, self, "door")
+	door_tool.set_modal(modal)
 	door_tool.exit_requested.connect(_on_tool_exit)
 
 	window_tool = OpeningTool.new()
 	window_tool.name = "WindowTool"
 	add_child(window_tool)
 	window_tool.setup(world, camera_rig, hud, self, "window")
+	window_tool.set_modal(modal)
 	window_tool.exit_requested.connect(_on_tool_exit)
 
 	floor_opening_tool = FloorOpeningTool.new()
 	floor_opening_tool.name = "FloorOpeningTool"
 	add_child(floor_opening_tool)
 	floor_opening_tool.setup(world, camera_rig, hud, self)
+	floor_opening_tool.set_modal(modal)
 	floor_opening_tool.exit_requested.connect(_on_tool_exit)
 
 	delete_tool = DeleteTool.new()
@@ -141,18 +162,19 @@ func _ready() -> void:
 	select_tool = SelectTool.new()
 	select_tool.name = "SelectTool"
 	add_child(select_tool)
-	select_tool.setup(world, camera_rig, hud, hotbar, self)
+	select_tool.setup(world, camera_rig, hud, hotbar, self, modal)
 
 	library_panel = LibraryPanel.new()
 	library_panel.name = "LibraryPanel"
 	add_child(library_panel)
 	library_panel.setup(library, builder, camera_rig, hud)
 	library_panel.device_selected.connect(_on_device_selected)
+	modal.register(library_panel)
 
 	save_system = SaveSystem.new()
 	save_system.name = "SaveSystem"
 	add_child(save_system)
-	save_system.setup(world, player)
+	save_system.setup(world, player, library)
 	save_system.world_reset.connect(_on_world_reset)
 
 	menu = PauseMenu.new()
@@ -160,43 +182,25 @@ func _ready() -> void:
 	add_child(menu)
 	menu.setup(camera_rig, save_system)
 
+	_build_registry()
 	_set_tool("none")
 
-func is_material_dialog_open() -> bool:
-	return material_panel != null and material_panel.is_open()
-
+## 任一登记弹窗（材质 / 工具参数 / 元素库 / 阵列）打开即返回 true；方法保留，对外兼容。
 func is_any_dialog_open() -> bool:
-	if material_panel != null and material_panel.is_open():
-		return true
-	if tool_params_panel != null and tool_params_panel.is_open():
-		return true
-	if library_panel != null and library_panel.is_open():
-		return true
-	if select_tool != null and select_tool.has_method("is_array_dialog_open") and select_tool.is_array_dialog_open():
-		return true
-	return false
+	return modal != null and modal.any_open()
 
 func sync_param_bar() -> void:
 	if is_any_dialog_open():
 		return
-	if current_tool == "column":
-		param_bar.show_context("placement", "column", builder.material_id, false)
-	elif current_tool == "wall":
-		param_bar.show_context("placement", "wall", wall_tool.material_id, false)
-	elif current_tool == "floor_tile":
-		param_bar.show_context("placement", "floor_tile", floor_tile_tool.material_id, false)
-	elif current_tool == "stair":
-		param_bar.show_context("placement", "stair", stair_tool.material_id, false)
-	elif current_tool == "door":
-		param_bar.show_context("placement", "door", "", false)
-	elif current_tool == "window":
-		param_bar.show_context("placement", "window", "", false)
-	elif current_tool == "floor_hole":
-		param_bar.show_context("placement", "floor_hole", "", false)
-	elif current_tool == "none" and select_tool != null and select_tool.wants_param_bar():
+	if current_tool == "none" and select_tool != null and select_tool.wants_param_bar():
 		select_tool.sync_param_bar(param_bar)
-	else:
-		param_bar.hide_bar()
+		return
+	# placement 分支：按注册表 id 匹配（device 无注册项 → 隐藏，与原行为一致）
+	for entry in _registry:
+		if String(entry["id"]) == current_tool:
+			param_bar.show_context("placement", String(entry["kind"]), entry["tool"].get_material_id(), false)
+			return
+	param_bar.hide_bar()
 
 func _on_param_action(action_id: String) -> void:
 	if not param_bar.is_visible_bar():
@@ -218,21 +222,10 @@ func _open_tool_params() -> void:
 	var kind := param_bar.get_kind()
 	var dims: Dictionary = {}
 	if ctx == "placement":
-		match kind:
-			"column":
-				dims = builder.get_placement_dims()
-			"wall":
-				dims = wall_tool.get_placement_dims()
-			"floor_tile":
-				dims = floor_tile_tool.get_placement_dims()
-			"stair":
-				dims = stair_tool.get_placement_dims()
-			"door":
-				dims = door_tool.get_placement_dims()
-			"window":
-				dims = window_tool.get_placement_dims()
-			"floor_hole":
-				dims = floor_opening_tool.get_placement_dims()
+		var tool: Variant = _placement_tool_for(kind)
+		if tool == null:
+			return
+		dims = tool.get_placement_dims()
 	elif ctx == "selection":
 		dims = select_tool.get_selected_logical_dims()
 	else:
@@ -250,21 +243,9 @@ func _on_tool_params_confirmed() -> void:
 	var ctx := param_bar.get_context()
 	tool_params_panel.hide_dialog()
 	if ctx == "placement":
-		match kind:
-			"column":
-				builder.apply_placement_dims(dims)
-			"wall":
-				wall_tool.apply_placement_dims(dims)
-			"floor_tile":
-				floor_tile_tool.apply_placement_dims(dims)
-			"stair":
-				stair_tool.apply_placement_dims(dims)
-			"door":
-				door_tool.apply_placement_dims(dims)
-			"window":
-				window_tool.apply_placement_dims(dims)
-			"floor_hole":
-				floor_opening_tool.apply_placement_dims(dims)
+		var tool: Variant = _placement_tool_for(kind)
+		if tool != null:
+			tool.apply_placement_dims(dims)
 		hud.set_status("已更新放置参数（F1 可再改）")
 	elif ctx == "selection":
 		select_tool.apply_selected_dims(dims)
@@ -277,20 +258,11 @@ func _on_tool_params_cancelled() -> void:
 	sync_param_bar()
 	if current_tool == "none":
 		select_tool.refresh_status_after_material()
-	elif current_tool == "column":
-		builder.refresh_material_hud()
-	elif current_tool == "wall":
-		wall_tool.refresh_material_hud()
-	elif current_tool == "floor_tile":
-		floor_tile_tool.refresh_material_hud()
-	elif current_tool == "stair":
-		stair_tool.refresh_material_hud()
-	elif current_tool == "door":
-		door_tool.refresh_hud()
-	elif current_tool == "window":
-		window_tool.refresh_hud()
-	elif current_tool == "floor_hole":
-		floor_opening_tool.refresh_hud()
+	else:
+		# placement：统一走 refresh_param_hud（开洞类刷新 HUD；其余沿用材质刷新）
+		var tool: Variant = _placement_tool_for(current_tool)
+		if tool != null:
+			tool.refresh_param_hud()
 
 func _on_material_confirmed() -> void:
 	if material_panel == null:
@@ -300,19 +272,12 @@ func _on_material_confirmed() -> void:
 	var ctx := param_bar.get_context()
 	var kind := param_bar.get_kind()
 	if ctx == "placement":
-		match kind:
-			"column":
-				builder.material_id = mat
-				builder.refresh_material_hud()
-			"wall":
-				wall_tool.material_id = mat
-				wall_tool.refresh_material_hud()
-			"floor_tile":
-				floor_tile_tool.material_id = mat
-				floor_tile_tool.refresh_material_hud()
-			"stair":
-				stair_tool.material_id = mat
-				stair_tool.refresh_material_hud()
+		# 仅支持材质的类型写材质并刷新；开洞类跳过（set_material_id 忽略）
+		if Kinds.has_material(kind):
+			var tool: Variant = _placement_tool_for(kind)
+			if tool != null:
+				tool.set_material_id(mat)
+				tool.refresh_material_hud()
 		param_bar.set_material(mat)
 		hud.set_status("材质：%s（F3 可再改）" % Config.material_label(mat))
 	elif ctx == "selection":
@@ -325,16 +290,12 @@ func _on_material_cancelled() -> void:
 	if material_panel != null:
 		material_panel.hide_dialog()
 	sync_param_bar()
-	if current_tool == "column":
-		builder.refresh_material_hud()
-	elif current_tool == "wall":
-		wall_tool.refresh_material_hud()
-	elif current_tool == "floor_tile":
-		floor_tile_tool.refresh_material_hud()
-	elif current_tool == "stair":
-		stair_tool.refresh_material_hud()
-	elif current_tool == "none":
+	if current_tool == "none":
 		select_tool.refresh_status_after_material()
+	elif Kinds.has_material(current_tool):
+		var tool: Variant = _placement_tool_for(current_tool)
+		if tool != null:
+			tool.refresh_material_hud()
 
 func _on_world_reset() -> void:
 	_set_tool("none")
@@ -366,67 +327,6 @@ func _build_ground() -> StaticBody3D:
 	add_child(ground)
 	return ground
 
-## Forward+：4x MSAA 3D + TAA（俯视正交由 CameraController 关闭 TAA 以免拖影）。
-## 2x MSAA 2D 照顾 UI 文字/图标。运行时写 Viewport，编辑器 Play 立即生效。
-func _apply_antialiasing() -> void:
-	var vp := get_viewport()
-	if vp == null:
-		return
-	vp.msaa_3d = Viewport.MSAA_4X
-	vp.msaa_2d = Viewport.MSAA_2X
-	vp.use_taa = true
-	vp.screen_space_aa = Viewport.SCREEN_SPACE_AA_DISABLED
-	vp.use_debanding = true
-
-
-func _build_environment() -> void:
-	var env := Environment.new()
-	var sky := Sky.new()
-	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = Color(0.72, 0.74, 0.77)
-	sky_mat.sky_horizon_color = Color(0.92, 0.93, 0.94)
-	sky_mat.ground_horizon_color = Color(0.48, 0.46, 0.34)
-	sky_mat.ground_bottom_color = Color(0.28, 0.24, 0.18)
-	sky.sky_material = sky_mat
-	env.background_mode = Environment.BG_SKY
-	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.glow_enabled = true
-	env.glow_intensity = 0.1
-	env.glow_bloom = 0.0
-	env.glow_strength = 0.8
-	env.ssao_enabled = true
-	env.ssao_intensity = 2.2
-	env.ssao_radius = 0.5
-	env.ssao_sharpness = 0.9
-	env.ssao_light_affect = 0.3
-	env.fog_enabled = true
-	env.fog_mode = Environment.FOG_MODE_DEPTH
-	env.fog_light_color = Color(0.62, 0.60, 0.48)
-	env.fog_depth_begin = 40.0
-	env.fog_depth_end = 260.0
-	env.fog_depth_curve = 1.0
-	env.fog_sky_affect = 0.05
-	var we := WorldEnvironment.new()
-	we.environment = env
-	add_child(we)
-
-	var vignette := Vignette.new()
-	vignette.name = "Vignette"
-	add_child(vignette)
-	vignette.setup()
-
-	var sun := DirectionalLight3D.new()
-	sun.name = "Sun"
-	sun.rotation_degrees = Vector3(-55.0, -35.0, 0.0)
-	sun.light_color = Color(1.0, 0.98, 0.93)
-	sun.light_energy = 1.05
-	sun.light_angular_distance = 4.0
-	sun.shadow_enabled = true
-	sun.shadow_blur = 2.0
-	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
-	add_child(sun)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -477,22 +377,43 @@ func _set_tool(t: String) -> void:
 		if tool_params_panel.is_open():
 			tool_params_panel.hide_dialog()
 	current_tool = t
-	wall_tool.set_active(t == "wall")
-	floor_tile_tool.set_active(t == "floor_tile")
-	stair_tool.set_active(t == "stair")
-	door_tool.set_active(t == "door")
-	window_tool.set_active(t == "window")
-	floor_opening_tool.set_active(t == "floor_hole")
+	# 注册表驱动激活（builder 无 set_active，由下方 set_tool 单独控制）
+	for entry in _registry:
+		var tool_node: Node = entry["tool"]
+		if tool_node.has_method("set_active"):
+			tool_node.set_active(String(entry["id"]) == t)
 	delete_tool.set_active(t == "delete")
 	select_tool.set_active(t == "none")
 	builder.set_tool("column" if t == "column" else "device" if t == "device" else "none")
 	hotbar.set_state(t)
 	sync_param_bar()
-	if not _is_placement_tool(t):
+	if not Kinds.is_placement(t):
 		ground_grid.set_patch_visible(false)
 
-func _is_placement_tool(t: String) -> bool:
-	return t == "column" or t == "wall" or t == "floor_tile" or t == "stair" or t == "device" or t == "door" or t == "window" or t == "floor_hole"
+## 注册放置工具：id 为工具栏/按键标识，kind 为物体类型（当前两者一致）。
+func _build_registry() -> void:
+	_register_tool("column", "column", builder)
+	_register_tool("wall", "wall", wall_tool)
+	_register_tool("floor_tile", "floor_tile", floor_tile_tool)
+	_register_tool("stair", "stair", stair_tool)
+	_register_tool("door", "door", door_tool)
+	_register_tool("window", "window", window_tool)
+	_register_tool("floor_hole", "floor_hole", floor_opening_tool)
+
+func _register_tool(id: String, kind: String, tool: Node) -> void:
+	_registry.append({"id": id, "kind": kind, "tool": tool})
+
+## 按注册 id 查工具；device 复用 builder 的 column 项。未注册返回 null。
+func _tool_by_id(id: String) -> Variant:
+	var target := "column" if id == "device" else id
+	for entry in _registry:
+		if String(entry["id"]) == target:
+			return entry["tool"]
+	return null
+
+## 按物体类型查放置工具（device 复用 builder 的 column 项）。未注册返回 null。
+func _placement_tool_for(kind: String) -> Variant:
+	return _tool_by_id(kind)
 
 ## 放置工具激活且有有效瞄准时，把局部网格贴在物体脚点下；否则立刻隐藏。
 func _physics_process(_delta: float) -> void:
@@ -501,36 +422,20 @@ func _physics_process(_delta: float) -> void:
 func _sync_placement_grid() -> void:
 	if ground_grid == null:
 		return
-	if is_any_dialog_open() or not _is_placement_tool(current_tool):
+	if is_any_dialog_open() or not Kinds.is_placement(current_tool):
 		ground_grid.set_patch_visible(false)
 		return
-	var origin: Variant = null
-	var extent := 6.5
-	match current_tool:
-		"column", "device":
-			origin = builder.get_grid_origin()
-			extent = builder.get_grid_extent()
-		"wall":
-			origin = wall_tool.get_grid_origin()
-			extent = wall_tool.get_grid_extent()
-		"floor_tile":
-			origin = floor_tile_tool.get_grid_origin()
-			extent = floor_tile_tool.get_grid_extent()
-		"stair":
-			origin = stair_tool.get_grid_origin()
-			extent = stair_tool.get_grid_extent()
-		"door":
-			origin = door_tool.get_grid_origin()
-			extent = door_tool.get_grid_extent()
-		"window":
-			origin = window_tool.get_grid_origin()
-			extent = window_tool.get_grid_extent()
-		"floor_hole":
-			origin = floor_opening_tool.get_grid_origin()
-			extent = floor_opening_tool.get_grid_extent()
+	var tool: Variant = _placement_tool_for(current_tool)
+	if tool == null:
+		ground_grid.set_patch_visible(false)
+		return
+	var origin: Variant = tool.get_grid_origin()
 	if origin == null:
 		ground_grid.set_patch_visible(false)
 		return
+	var extent := 6.5
+	if tool.has_method("get_grid_extent"):
+		extent = tool.get_grid_extent()
 	var p: Vector3 = origin
 	ground_grid.set_origin(p)
 	ground_grid.set_patch_size(extent)

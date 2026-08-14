@@ -8,9 +8,6 @@ extends Node3D
 
 signal exit_requested
 
-const DELETABLE_KINDS := ["wall", "column", "device", "floor_tile", "stair"]
-const KIND_NAMES := {"wall": "墙体", "column": "柱子", "device": "设备", "floor_tile": "地板", "stair": "楼梯"}
-
 var world: WorldStore
 var camera_rig: CameraController
 var hud: Hud
@@ -107,7 +104,7 @@ func _physics_process(_delta: float) -> void:
 	if not aim.is_empty():
 		var body: Object = aim.get("body")
 		if body != null and body is StaticBody3D and body.has_meta("kind") \
-				and DELETABLE_KINDS.has(body.get_meta("kind")) and body.collision_layer != 0:
+				and Kinds.DELETABLE_KINDS.has(body.get_meta("kind")) and body.collision_layer != 0:
 			target = body
 			solid_d = (aim["point"] as Vector3).distance_to(origin)
 	if not op_hit.is_empty():
@@ -170,7 +167,7 @@ func _update_hud() -> void:
 		hud.set_length("左键删除该洞口")
 		return
 	var size: Vector3 = _hover.get_meta("size")
-	var kind_name: String = KIND_NAMES.get(_hover.get_meta("kind"), "物体")
+	var kind_name: String = Kinds.label(_hover.get_meta("kind"))
 	hud.set_tool_info("目标: %s%s   %.1f×%.1f×%.1f m" % [
 		kind_name,
 		"（%s）" % _hover.get_meta("name") if _hover.has_meta("name") else "",
@@ -189,7 +186,7 @@ func _marquee_victims(rect: Rect2) -> Array:
 	for obj in world.placed:
 		if obj.collision_layer == 0:
 			continue
-		if not obj.has_meta("kind") or not DELETABLE_KINDS.has(obj.get_meta("kind")):
+		if not obj.has_meta("kind") or not Kinds.DELETABLE_KINDS.has(obj.get_meta("kind")):
 			continue
 		var pos: Vector3 = obj.global_position
 		if cam.is_position_behind(pos):
@@ -243,7 +240,7 @@ func _delete_hover() -> void:
 		hud.set_tool_info("")
 		hud.set_length("")
 		return
-	var kind_name: String = KIND_NAMES.get(body.get_meta("kind"), "物体")
+	var kind_name: String = Kinds.label(body.get_meta("kind"))
 	if body.has_meta("name"):
 		kind_name += "（%s）" % body.get_meta("name")
 	world.remove(body)

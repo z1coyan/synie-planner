@@ -1,22 +1,13 @@
 class_name StairTool
-extends Node3D
+extends PlacementToolBase
 
 ## 楼梯工具：单击落点放置（底面中心为起点），朝向吸附世界 XZ 四向正交（无自由 yaw）。
 ## 右键退出到「无」。F1 宽/长/高，F3 材质。局部网格与柱/墙/地板一致。
 
-signal exit_requested
-
-var world: WorldStore
-var camera_rig: CameraController
-var hud: Hud
-var host: Node
-
-var material_id := Config.DEFAULT_MATERIAL
 var stair_width := Config.STAIR_WIDTH
 var stair_length := Config.STAIR_LENGTH
 var stair_height := Config.STAIR_HEIGHT
 
-var active := false
 var valid := false
 
 var _preview_root: Node3D
@@ -33,21 +24,7 @@ func setup(w: WorldStore, cc: CameraController, h: Hud, main_host: Node = null) 
 	host = main_host
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
-	_preview_root = Node3D.new()
-	_preview_root.name = "StairPreview"
-	_preview_root.visible = false
-	add_child(_preview_root)
-
-func _holo_mat(base: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = base
-	m.emission_enabled = true
-	var e := base
-	e.a = 1.0
-	m.emission = e
-	return m
+	_preview_root = _make_preview_root("StairPreview")
 
 func set_active(a: bool) -> void:
 	active = a
@@ -60,9 +37,6 @@ func set_active(a: bool) -> void:
 
 func refresh_material_hud() -> void:
 	_update_hud()
-
-func _dialog_open() -> bool:
-	return host != null and host.has_method("is_any_dialog_open") and host.is_any_dialog_open()
 
 ## 相机水平朝向吸附到最近世界轴。踏步沿局部 -Z 上行：
 ## 0 → -Z，π/2 → -X，π → +Z，-π/2 → +X。不使用任意角度。

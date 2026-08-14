@@ -1,5 +1,5 @@
 class_name FloorTileTool
-extends Node3D
+extends PlacementToolBase
 
 ## 地板工具：两段式点击。点击起点（点1）、移动鼠标预览、点击终点（点2），
 ## 铺设两点间的矩形地板（单块，任意尺寸，与画墙一致）。
@@ -8,17 +8,7 @@ extends Node3D
 ## 起点必须在地面、已有地板或墙柱表面；墙体/柱子不阻挡（地板从其下方铺过），
 ## 不与其他地板做碰撞检测；重叠或共边且同标高的地板合并为一块。绿=可放 / 红=与设备重叠，右键取消笔画或退出工具。
 
-signal exit_requested
-
-var world: WorldStore
-var camera_rig: CameraController
-var hud: Hud
-
-var material_id := Config.DEFAULT_MATERIAL
 var floor_thickness := Config.FLOOR_THICKNESS
-var host: Node
-
-var active := false
 var valid := false
 
 var _drawing := false
@@ -44,42 +34,13 @@ func setup(w: WorldStore, cc: CameraController, h: Hud, main_host: Node = null) 
 	host = main_host
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
-	_preview_root = Node3D.new()
-	_preview_root.name = "FloorTilePreview"
-	_preview_root.visible = false
-	add_child(_preview_root)
+	_preview_root = _make_preview_root("FloorTilePreview")
 	_fill_mi = MeshInstance3D.new()
 	_wire_mi = MeshInstance3D.new()
 	_preview_root.add_child(_fill_mi)
 	_preview_root.add_child(_wire_mi)
 	_start_marker = _make_marker(Config.COLOR_ACCENT)
 	_hover_marker = _make_marker(Config.COLOR_PATH)
-
-func _make_marker(color: Color) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.2, 0.2, 0.2)
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.albedo_color = color
-	m.emission_enabled = true
-	m.emission = color
-	bm.material = m
-	mi.mesh = bm
-	mi.visible = false
-	add_child(mi)
-	return mi
-
-func _holo_mat(base: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = base
-	m.emission_enabled = true
-	var e := base
-	e.a = 1.0
-	m.emission = e
-	return m
 
 func set_active(a: bool) -> void:
 	active = a
@@ -335,9 +296,6 @@ func _build_wire(box_size: Vector3) -> ImmediateMesh:
 		im.surface_add_vertex(corners[e.y])
 	im.surface_end()
 	return im
-
-func _dialog_open() -> bool:
-	return host != null and host.has_method("is_any_dialog_open") and host.is_any_dialog_open()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if not active:

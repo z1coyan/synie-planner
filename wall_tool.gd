@@ -1,24 +1,15 @@
 class_name WallTool
-extends Node3D
+extends PlacementToolBase
 
 ## 墙体：连续点击绘制，起点/终点有可视化标记，实时显示长度，[ ] 调整墙厚。
 ## 墙面基准高度取起点所在表面；端点磁吸墙/柱/地板角点与柱心。
 ## 右键：绘制中取消当前笔画；空闲时 exit_requested 切回「无」。
 
-signal exit_requested
-
-var world: WorldStore
-var camera_rig: CameraController
-var hud: Hud
-var host: Node
-
-var active := false
 var drawing := false
 var start_point: Vector3
 var thickness := Config.WALL_THICKNESS_DEFAULT
 var wall_height := Config.WALL_HEIGHT
 var base_y := 0.0
-var material_id := Config.DEFAULT_MATERIAL
 
 var _preview_root: Node3D
 var _fill_mi: MeshInstance3D
@@ -43,10 +34,7 @@ func setup(w: WorldStore, cc: CameraController, h: Hud, main_host: Node = null) 
 	host = main_host
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
-	_preview_root = Node3D.new()
-	_preview_root.name = "WallPreview"
-	_preview_root.visible = false
-	add_child(_preview_root)
+	_preview_root = _make_preview_root("WallPreview")
 	_fill_mi = MeshInstance3D.new()
 	_preview_root.add_child(_fill_mi)
 	_start_marker = _make_marker(Config.COLOR_ACCENT)
@@ -56,35 +44,6 @@ func refresh_material_hud() -> void:
 	_update_hud()
 	if active and not drawing:
 		hud.set_status("画墙：连续点击端点（当前：%s，F1 参数 / F3 材质），实时显示长度" % Config.material_label(material_id))
-
-func _dialog_open() -> bool:
-	return host != null and host.has_method("is_any_dialog_open") and host.is_any_dialog_open()
-
-func _make_marker(color: Color) -> MeshInstance3D:
-	var mi := MeshInstance3D.new()
-	var bm := BoxMesh.new()
-	bm.size = Vector3(0.2, 0.2, 0.2)
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.albedo_color = color
-	m.emission_enabled = true
-	m.emission = color
-	bm.material = m
-	mi.mesh = bm
-	mi.visible = false
-	add_child(mi)
-	return mi
-
-func _holo_mat(base: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = base
-	m.emission_enabled = true
-	var e := base
-	e.a = 1.0
-	m.emission = e
-	return m
 
 func set_active(a: bool) -> void:
 	active = a

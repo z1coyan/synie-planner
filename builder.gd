@@ -1,24 +1,17 @@
 class_name Builder
-extends Node3D
+extends PlacementToolBase
 
 ## 柱子 / 设备放置：全息预览跟随鼠标准星（无全局网格吸附；柱子可磁吸墙中心线），
 ## R 键旋转 90°，绿=可放，红=干涉。设备尺寸/颜色取自元素库。
 ## 右键退出放置，经 exit_requested 切回工具「无」。
 
-signal exit_requested
-
-var world: WorldStore
-var camera_rig: CameraController
-var hud: Hud
 var library: ElementLibrary
-var host: Node  # Main：材质对话框 / 参数栏协调
 
 var tool := "none"          # "none" | "column" | "device"
 var rot_steps := 0           # 0..3 → 旋转 0/90/180/270°
 var col_size_index := 0      # 柱子截面预设下标（Config.COLUMN_SIZES），E 键快速切换
 var column_height := Config.COLUMN_HEIGHT
 var column_thickness := Config.COLUMN_WIDTH
-var material_id := Config.DEFAULT_MATERIAL
 var valid := false
 
 var _preview_root: Node3D
@@ -36,10 +29,7 @@ func setup(w: WorldStore, cc: CameraController, h: Hud, lib: ElementLibrary, mai
 	host = main_host
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
-	_preview_root = Node3D.new()
-	_preview_root.name = "PlacementPreview"
-	_preview_root.visible = false
-	add_child(_preview_root)
+	_preview_root = _make_preview_root("PlacementPreview")
 	_fill_mi = MeshInstance3D.new()
 	_wire_mi = MeshInstance3D.new()
 	_preview_root.add_child(_fill_mi)
@@ -51,20 +41,6 @@ func refresh_device() -> void:
 
 func refresh_material_hud() -> void:
 	_update_hud()
-
-func _dialog_open() -> bool:
-	return host != null and host.has_method("is_any_dialog_open") and host.is_any_dialog_open()
-
-func _holo_mat(base: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = base
-	m.emission_enabled = true
-	var e := base
-	e.a = 1.0
-	m.emission = e
-	return m
 
 func set_tool(t: String) -> void:
 	tool = t

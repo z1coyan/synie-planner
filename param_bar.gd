@@ -6,13 +6,6 @@ extends CanvasLayer
 
 signal action_requested(action_id: String)
 
-const KIND_NAMES := {
-	"column": "柱子", "wall": "墙体", "floor_tile": "地板", "stair": "楼梯",
-	"door": "门洞", "window": "窗洞", "floor_hole": "地洞",
-}
-const MATERIAL_KINDS := ["column", "wall", "floor_tile", "stair"]
-const PARAM_KINDS := ["column", "wall", "floor_tile", "stair", "door", "window", "floor_hole"]
-
 var _root: HBoxContainer
 var _kind_label: Label
 var _mat_label: Label
@@ -132,18 +125,18 @@ func _on_slot_input(event: InputEvent, action_id: String) -> void:
 
 ## context: "placement" | "selection"；placement 隐藏 F2，selection 显示 F2
 func show_context(context: String, kind: String, material_id: String, show_array: bool = false) -> void:
-	if not PARAM_KINDS.has(kind):
+	if not Kinds.PARAM_KINDS.has(kind):
 		hide_bar()
 		return
 	_context = context
 	_kind = kind
 	_show_array = show_array and context == "selection"
-	_kind_label.text = KIND_NAMES.get(kind, "参数")
+	_kind_label.text = Kinds.label(kind)
 	if context == "selection":
-		_kind_label.text = "已选 · %s" % KIND_NAMES.get(kind, "物体")
+		_kind_label.text = "已选 · %s" % Kinds.label(kind)
 	elif context == "placement":
-		_kind_label.text = "放置 · %s" % KIND_NAMES.get(kind, "物体")
-	var show_mat := MATERIAL_KINDS.has(kind)
+		_kind_label.text = "放置 · %s" % Kinds.label(kind)
+	var show_mat := Kinds.MATERIAL_KINDS.has(kind)
 	_f3_slot.visible = show_mat
 	if show_mat:
 		_material_id = Config.normalize_material(material_id)

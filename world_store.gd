@@ -3,8 +3,6 @@ extends Node3D
 
 ## 已放置物体的统一仓库：负责创建碰撞体、查询干涉、拾取表面。
 
-const MATERIAL_KINDS := ["floor_tile", "column", "wall", "stair"]
-
 var content: Node3D
 var ground_body: StaticBody3D
 var placed: Array = []
@@ -25,13 +23,13 @@ func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: floa
 	var mat_id := ""
 	if material != "":
 		mat_id = Config.normalize_material(material)
-	elif MATERIAL_KINDS.has(kind):
+	elif Kinds.MATERIAL_KINDS.has(kind):
 		mat_id = Config.DEFAULT_MATERIAL
 
 	# 地板：层 1 供玩家站立与设备干涉；mask=0 故静体互不碰撞。
 	# 铺设查询另行忽略 floor_tile，重叠/共边的共面地板在此合并为一块。
 	if kind == "floor_tile":
-		var floor_mat := _surface_mat(mat_id if mat_id != "" else Config.DEFAULT_MATERIAL)
+		var floor_mat := ElementGeometry.surface_mat(mat_id if mat_id != "" else Config.DEFAULT_MATERIAL)
 		body.set_meta("kind", kind)
 		body.set_meta("size", size)
 		body.set_meta("color", floor_mat.albedo_color)
@@ -43,7 +41,7 @@ func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: floa
 		body.set_meta("openings", _sanitize_floor_openings(openings))
 		content.add_child(body)
 		placed.append(body)
-		_rebuild_floor_geom(body)
+		ElementGeometry.rebuild_floor_geom(body)
 		dirty = true
 		return _merge_connected_floors(body)
 
@@ -52,10 +50,10 @@ func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: floa
 	bm.size = size
 	var mat: StandardMaterial3D
 	if mat_id != "":
-		mat = _surface_mat(mat_id)
+		mat = ElementGeometry.surface_mat(mat_id)
 		color = mat.albedo_color
 	else:
-		mat = _clay_mat(color)
+		mat = ElementGeometry.clay_mat(color)
 	bm.material = mat
 	mi.mesh = bm
 	body.add_child(mi)
@@ -87,57 +85,19 @@ func place_box(cx: Vector3, size: Vector3, color: Color, kind: String, yaw: floa
 	dirty = true
 	return body
 
-## 由盒中心与尺寸得到 XZ 矩形（地板无 yaw，按轴对齐）。
+## 由盒中心与尺寸得到 XZ 矩形（地板无 yaw，按轴对齐）。纯几何，见 RectOps。
 func _xz_rect_from_box(cx: Vector3, size: Vector3) -> Array:
-	return [{
-		"x0": cx.x - size.x * 0.5,
-		"x1": cx.x + size.x * 0.5,
-		"z0": cx.z - size.z * 0.5,
-		"z1": cx.z + size.z * 0.5,
-	}]
+	return RectOps.xz_rect_from_box(cx, size)
 
 
+## 归一化地板碎片：翻转反向坐标、丢弃窄于 0.001 的碎片。纯几何，见 RectOps。
 func _sanitize_floor_pieces(pieces: Array) -> Array:
-	var out: Array = []
-	for p_v in pieces:
-		if typeof(p_v) != TYPE_DICTIONARY:
-			continue
-		var p: Dictionary = p_v
-		var x0 := float(p.get("x0", 0.0))
-		var x1 := float(p.get("x1", 0.0))
-		var z0 := float(p.get("z0", 0.0))
-		var z1 := float(p.get("z1", 0.0))
-		if x1 < x0:
-			var tx := x0
-			x0 = x1
-			x1 = tx
-		if z1 < z0:
-			var tz := z0
-			z0 = z1
-			z1 = tz
-		if x1 - x0 < 0.001 or z1 - z0 < 0.001:
-			continue
-		out.append({"x0": x0, "x1": x1, "z0": z0, "z1": z1})
-	return out
+	return RectOps.sanitize_floor_pieces(pieces)
 
 
-func _floor_pieces(body: StaticBody3D) -> Array:
-	if body != null and body.has_meta("pieces") and body.get_meta("pieces") is Array:
-		var pcs: Array = _sanitize_floor_pieces(body.get_meta("pieces"))
-		if not pcs.is_empty():
-			return pcs
-	var c: Vector3 = body.global_position if body.is_inside_tree() else body.position
-	var size: Vector3 = body.get_meta("size")
-	return _xz_rect_from_box(c, size)
-
-
+## 两矩形是否可合并为一块（重叠或共边）。纯几何，见 RectOps。
 func _xz_rects_joinable(a: Dictionary, b: Dictionary, eps: float = 0.002) -> bool:
-	var x_ov := minf(float(a["x1"]), float(b["x1"])) - maxf(float(a["x0"]), float(b["x0"]))
-	var z_ov := minf(float(a["z1"]), float(b["z1"])) - maxf(float(a["z0"]), float(b["z0"]))
-	if x_ov < -eps or z_ov < -eps:
-		return false
-	# 仅角点相触不算共边，避免对角两块被合成一块。
-	return x_ov > eps or z_ov > eps
+	return RectOps.xz_rects_joinable(a, b, eps)
 
 
 func _floors_coplanar(a: StaticBody3D, b: StaticBody3D) -> bool:
@@ -149,8 +109,8 @@ func _floors_coplanar(a: StaticBody3D, b: StaticBody3D) -> bool:
 
 
 func _floor_pieces_joinable(a: StaticBody3D, b: StaticBody3D) -> bool:
-	var pa := _floor_pieces(a)
-	var pb := _floor_pieces(b)
+	var pa := ElementGeometry.floor_pieces(a)
+	var pb := ElementGeometry.floor_pieces(b)
 	for ra in pa:
 		for rb in pb:
 			if _xz_rects_joinable(ra, rb):
@@ -179,142 +139,9 @@ func _connected_coplanar_floors(src_floor: StaticBody3D) -> Array:
 	return group
 
 
-## 轴对齐矩形并集：按边线剖分格子，只保留被覆盖的单元再合并成块。
-## 不会填上 L 形缺口；重叠区只覆盖一次，避免双层厚度。
+## 轴对齐矩形并集（不填 L 形缺口、重叠区只计一次）。纯几何，见 RectOps。
 func _union_xz_rects(rects: Array) -> Array:
-	var cleaned := _sanitize_floor_pieces(rects)
-	if cleaned.is_empty():
-		return []
-	if cleaned.size() == 1:
-		return cleaned
-	var xs: Array = []
-	var zs: Array = []
-	for r in cleaned:
-		xs.append(float(r["x0"]))
-		xs.append(float(r["x1"]))
-		zs.append(float(r["z0"]))
-		zs.append(float(r["z1"]))
-	xs.sort()
-	zs.sort()
-	var ux := _unique_floats(xs)
-	var uz := _unique_floats(zs)
-	var nx := ux.size() - 1
-	var nz := uz.size() - 1
-	if nx < 1 or nz < 1:
-		return cleaned
-	var covered: Array = []
-	for i in nx:
-		var row: Array = []
-		for j in nz:
-			var cx := (ux[i] + ux[i + 1]) * 0.5
-			var cz := (uz[j] + uz[j + 1]) * 0.5
-			var hit := false
-			for r in cleaned:
-				if cx > float(r["x0"]) + 0.0002 and cx < float(r["x1"]) - 0.0002 \
-						and cz > float(r["z0"]) + 0.0002 and cz < float(r["z1"]) - 0.0002:
-					hit = true
-					break
-			row.append(hit)
-		covered.append(row)
-	var used: Array = []
-	for i in nx:
-		var urow: Array = []
-		for j in nz:
-			urow.append(false)
-		used.append(urow)
-	var out: Array = []
-	for j in nz:
-		for i in nx:
-			if not covered[i][j] or used[i][j]:
-				continue
-			var i2 := i
-			while i2 + 1 < nx and covered[i2 + 1][j] and not used[i2 + 1][j]:
-				i2 += 1
-			var j2 := j
-			while j2 + 1 < nz:
-				var ok := true
-				for ii in range(i, i2 + 1):
-					if not covered[ii][j2 + 1] or used[ii][j2 + 1]:
-						ok = false
-						break
-				if not ok:
-					break
-				j2 += 1
-			for ii in range(i, i2 + 1):
-				for jj in range(j, j2 + 1):
-					used[ii][jj] = true
-			var x0b := ux[i]
-			var x1b := ux[i2 + 1]
-			var z0b := uz[j]
-			var z1b := uz[j2 + 1]
-			if x1b - x0b < 0.001 or z1b - z0b < 0.001:
-				continue
-			out.append({"x0": x0b, "x1": x1b, "z0": z0b, "z1": z1b})
-	return out if not out.is_empty() else cleaned
-
-
-func _rebuild_floor_geom(body: StaticBody3D) -> void:
-	_clear_body_geom(body)
-	var pieces := _sanitize_floor_pieces(_floor_pieces(body))
-	if pieces.is_empty():
-		return
-	var h: float = float(body.get_meta("size").y)
-	var top_y: float
-	if body.is_inside_tree():
-		top_y = body.global_position.y + h * 0.5
-	else:
-		top_y = body.position.y + h * 0.5
-	var min_x := INF
-	var max_x := -INF
-	var min_z := INF
-	var max_z := -INF
-	for p in pieces:
-		min_x = minf(min_x, float(p["x0"]))
-		max_x = maxf(max_x, float(p["x1"]))
-		min_z = minf(min_z, float(p["z0"]))
-		max_z = maxf(max_z, float(p["z1"]))
-	var new_size := Vector3(max_x - min_x, h, max_z - min_z)
-	var new_pos := Vector3((min_x + max_x) * 0.5, top_y - h * 0.5, (min_z + max_z) * 0.5)
-	if body.is_inside_tree():
-		body.global_position = new_pos
-	else:
-		body.position = new_pos
-	body.set_meta("size", new_size)
-	body.set_meta("pieces", pieces)
-	body.set_meta("yaw", 0.0)
-	var mat_id := Config.DEFAULT_MATERIAL
-	if body.has_meta("material"):
-		mat_id = Config.normalize_material(String(body.get_meta("material")))
-	var mat := _surface_mat(mat_id)
-	body.set_meta("material", mat_id)
-	body.set_meta("color", mat.albedo_color)
-	var leftover := _subtract_xz_rects(pieces, _floor_openings(body))
-	if leftover.is_empty():
-		leftover = pieces
-	for i in leftover.size():
-		var p: Dictionary = leftover[i]
-		var sx := float(p["x1"]) - float(p["x0"])
-		var sz := float(p["z1"]) - float(p["z0"])
-		var lp := Vector3(
-			(float(p["x0"]) + float(p["x1"])) * 0.5 - new_pos.x,
-			0.0,
-			(float(p["z0"]) + float(p["z1"])) * 0.5 - new_pos.z)
-		var psz := Vector3(sx, h, sz)
-		var mi := MeshInstance3D.new()
-		mi.name = "FloorPiece_%d" % i
-		var bm := BoxMesh.new()
-		bm.size = psz
-		bm.material = mat
-		mi.mesh = bm
-		mi.position = lp
-		body.add_child(mi)
-		var cs := CollisionShape3D.new()
-		cs.name = "FloorCol_%d" % i
-		var bs := BoxShape3D.new()
-		bs.size = psz
-		cs.shape = bs
-		cs.position = lp
-		body.add_child(cs)
+	return RectOps.union_xz_rects(rects)
 
 
 ## 新铺地板与共面、重叠或共边的已有地板合并为一块（材质取新铺）。
@@ -329,8 +156,8 @@ func _merge_connected_floors(src_floor: StaticBody3D) -> StaticBody3D:
 	var all_ops: Array = []
 	for f_v in group:
 		var f: StaticBody3D = f_v
-		all_pieces.append_array(_floor_pieces(f))
-		all_ops.append_array(_floor_openings(f))
+		all_pieces.append_array(ElementGeometry.floor_pieces(f))
+		all_ops.append_array(ElementGeometry.floor_openings(f))
 	var unioned := _union_xz_rects(all_pieces)
 	if unioned.is_empty():
 		return src_floor
@@ -362,7 +189,7 @@ func _merge_connected_floors(src_floor: StaticBody3D) -> StaticBody3D:
 	survivor.set_meta("pieces", unioned)
 	survivor.set_meta("openings", _sanitize_floor_openings(all_ops))
 	survivor.set_meta("yaw", 0.0)
-	_rebuild_floor_geom(survivor)
+	ElementGeometry.rebuild_floor_geom(survivor)
 	dirty = true
 	return survivor
 
@@ -370,7 +197,7 @@ func _merge_connected_floors(src_floor: StaticBody3D) -> StaticBody3D:
 func _floor_piece_corners(obj: StaticBody3D) -> Array:
 	var out: Array = []
 	var y: float = obj.global_position.y
-	for p_v in _floor_pieces(obj):
+	for p_v in ElementGeometry.floor_pieces(obj):
 		if typeof(p_v) != TYPE_DICTIONARY:
 			continue
 		var p: Dictionary = p_v
@@ -386,159 +213,24 @@ func _floor_piece_corners(obj: StaticBody3D) -> Array:
 		return obb_corners(obj)
 	return out
 
+## 归一化地板开洞（补全 width/length）。纯几何，见 RectOps。
 func _sanitize_floor_openings(ops: Array) -> Array:
-	var out: Array = []
-	for p_v in ops:
-		if typeof(p_v) != TYPE_DICTIONARY:
-			continue
-		var p: Dictionary = p_v
-		var x0 := float(p.get("x0", 0.0))
-		var x1 := float(p.get("x1", 0.0))
-		var z0 := float(p.get("z0", 0.0))
-		var z1 := float(p.get("z1", 0.0))
-		if x1 < x0:
-			var tx := x0
-			x0 = x1
-			x1 = tx
-		if z1 < z0:
-			var tz := z0
-			z0 = z1
-			z1 = tz
-		if x1 - x0 < 0.001 or z1 - z0 < 0.001:
-			continue
-		out.append({
-			"type": "floor_hole",
-			"x0": x0, "x1": x1, "z0": z0, "z1": z1,
-			"width": x1 - x0, "length": z1 - z0,
-		})
-	return out
+	return RectOps.sanitize_floor_openings(ops)
 
 
-func _floor_openings(body: StaticBody3D) -> Array:
-	if body != null and body.has_meta("openings") and body.get_meta("openings") is Array:
-		return _sanitize_floor_openings(body.get_meta("openings"))
-	return []
-
-
+## 单个地板开洞的归一化数据。纯几何，见 RectOps。
 func _floor_opening_data(op: Dictionary) -> Dictionary:
-	var x0 := float(op.get("x0", 0.0))
-	var x1 := float(op.get("x1", 0.0))
-	var z0 := float(op.get("z0", 0.0))
-	var z1 := float(op.get("z1", 0.0))
-	if x1 < x0:
-		var tx := x0
-		x0 = x1
-		x1 = tx
-	if z1 < z0:
-		var tz := z0
-		z0 = z1
-		z1 = tz
-	return {
-		"type": "floor_hole",
-		"x0": x0, "x1": x1, "z0": z0, "z1": z1,
-		"width": x1 - x0, "length": z1 - z0,
-	}
+	return RectOps.floor_opening_data(op)
 
 
-## 从实心矩形中减去地洞，格子剖分后合并。洞口不填实，玩家可从洞落下。
+## 从实心矩形中减去地洞（洞口不填实）。纯几何，见 RectOps。
 func _subtract_xz_rects(solids: Array, holes: Array) -> Array:
-	var cleaned := _sanitize_floor_pieces(solids)
-	var hole_r := _sanitize_floor_openings(holes)
-	if cleaned.is_empty():
-		return []
-	if hole_r.is_empty():
-		return cleaned
-	var xs: Array = []
-	var zs: Array = []
-	for r in cleaned:
-		xs.append(float(r["x0"]))
-		xs.append(float(r["x1"]))
-		zs.append(float(r["z0"]))
-		zs.append(float(r["z1"]))
-	for r in hole_r:
-		xs.append(float(r["x0"]))
-		xs.append(float(r["x1"]))
-		zs.append(float(r["z0"]))
-		zs.append(float(r["z1"]))
-	xs.sort()
-	zs.sort()
-	var ux := _unique_floats(xs)
-	var uz := _unique_floats(zs)
-	var nx := ux.size() - 1
-	var nz := uz.size() - 1
-	if nx < 1 or nz < 1:
-		return cleaned
-	var covered: Array = []
-	for i in nx:
-		var row: Array = []
-		for j in nz:
-			var cx := (ux[i] + ux[i + 1]) * 0.5
-			var cz := (uz[j] + uz[j + 1]) * 0.5
-			var solid := false
-			for r in cleaned:
-				if cx > float(r["x0"]) + 0.0002 and cx < float(r["x1"]) - 0.0002 \
-						and cz > float(r["z0"]) + 0.0002 and cz < float(r["z1"]) - 0.0002:
-					solid = true
-					break
-			if solid:
-				for h in hole_r:
-					if cx > float(h["x0"]) + 0.0002 and cx < float(h["x1"]) - 0.0002 \
-							and cz > float(h["z0"]) + 0.0002 and cz < float(h["z1"]) - 0.0002:
-						solid = false
-						break
-			row.append(solid)
-		covered.append(row)
-	var used: Array = []
-	for i in nx:
-		var urow: Array = []
-		for j in nz:
-			urow.append(false)
-		used.append(urow)
-	var out: Array = []
-	for j in nz:
-		for i in nx:
-			if not covered[i][j] or used[i][j]:
-				continue
-			var i2 := i
-			while i2 + 1 < nx and covered[i2 + 1][j] and not used[i2 + 1][j]:
-				i2 += 1
-			var j2 := j
-			while j2 + 1 < nz:
-				var ok := true
-				for ii in range(i, i2 + 1):
-					if not covered[ii][j2 + 1] or used[ii][j2 + 1]:
-						ok = false
-						break
-				if not ok:
-					break
-				j2 += 1
-			for ii in range(i, i2 + 1):
-				for jj in range(j, j2 + 1):
-					used[ii][jj] = true
-			var x0b := ux[i]
-			var x1b := ux[i2 + 1]
-			var z0b := uz[j]
-			var z1b := uz[j2 + 1]
-			if x1b - x0b < 0.001 or z1b - z0b < 0.001:
-				continue
-			out.append({"x0": x0b, "x1": x1b, "z0": z0b, "z1": z1b})
-	return out
+	return RectOps.subtract_xz_rects(solids, holes)
 
 
+## 碎片集合的 XZ 包围盒。纯几何，见 RectOps。
 func _floor_aabb_xz(pieces: Array) -> Dictionary:
-	var cleaned := _sanitize_floor_pieces(pieces)
-	if cleaned.is_empty():
-		return {}
-	var min_x := INF
-	var max_x := -INF
-	var min_z := INF
-	var max_z := -INF
-	for p in cleaned:
-		min_x = minf(min_x, float(p["x0"]))
-		max_x = maxf(max_x, float(p["x1"]))
-		min_z = minf(min_z, float(p["z0"]))
-		max_z = maxf(max_z, float(p["z1"]))
-	return {"x0": min_x, "x1": max_x, "z0": min_z, "z1": max_z}
+	return RectOps.floor_aabb_xz(pieces)
 
 
 func floor_hole_snap_points(body: StaticBody3D) -> Array:
@@ -546,17 +238,17 @@ func floor_hole_snap_points(body: StaticBody3D) -> Array:
 	if body == null or not is_instance_valid(body):
 		return out
 	var top := top_surface_y(body)
-	var aabb := _floor_aabb_xz(_floor_pieces(body))
+	var aabb := _floor_aabb_xz(ElementGeometry.floor_pieces(body))
 	if aabb.is_empty():
 		return out
 	var grow := Config.SNAP_TO_CORNER
-	for p_v in _floor_pieces(body):
+	for p_v in ElementGeometry.floor_pieces(body):
 		var p: Dictionary = p_v
 		out.append(Vector3(float(p["x0"]), top, float(p["z0"])))
 		out.append(Vector3(float(p["x1"]), top, float(p["z0"])))
 		out.append(Vector3(float(p["x0"]), top, float(p["z1"])))
 		out.append(Vector3(float(p["x1"]), top, float(p["z1"])))
-	for h_v in _floor_openings(body):
+	for h_v in ElementGeometry.floor_openings(body):
 		var h: Dictionary = h_v
 		out.append(Vector3(float(h["x0"]), top, float(h["z0"])))
 		out.append(Vector3(float(h["x1"]), top, float(h["z0"])))
@@ -617,7 +309,7 @@ func prepare_floor_opening(body: StaticBody3D, world_point: Vector3, width: floa
 		return {}
 	if not body.has_meta("kind") or String(body.get_meta("kind")) != "floor_tile":
 		return {}
-	var pieces := _floor_pieces(body)
+	var pieces := ElementGeometry.floor_pieces(body)
 	var aabb := _floor_aabb_xz(pieces)
 	if aabb.is_empty():
 		return {}
@@ -665,7 +357,7 @@ func _clamp_floor_opening(body: StaticBody3D, pieces: Array, aabb: Dictionary, c
 			break
 	if not overlaps:
 		return {"ok": false, "clamped": clamped}
-	var trial: Array = _floor_openings(body).duplicate()
+	var trial: Array = ElementGeometry.floor_openings(body).duplicate()
 	trial.append({"x0": x0, "x1": x1, "z0": z0, "z1": z1})
 	var leftover := _subtract_xz_rects(pieces, trial)
 	if leftover.is_empty():
@@ -686,7 +378,7 @@ func _clamp_floor_opening(body: StaticBody3D, pieces: Array, aabb: Dictionary, c
 func add_floor_opening(body: StaticBody3D, x0: float, x1: float, z0: float, z1: float) -> Dictionary:
 	if body == null or not is_instance_valid(body) or not body.has_meta("kind") or String(body.get_meta("kind")) != "floor_tile":
 		return {"ok": false}
-	var pieces := _floor_pieces(body)
+	var pieces := ElementGeometry.floor_pieces(body)
 	var aabb := _floor_aabb_xz(pieces)
 	if aabb.is_empty():
 		return {"ok": false}
@@ -698,10 +390,10 @@ func add_floor_opening(body: StaticBody3D, x0: float, x1: float, z0: float, z1: 
 	if prep.is_empty() or not bool(prep.get("ok", false)):
 		return {"ok": false, "clamped": bool(prep.get("clamped", false))}
 	var stored := _floor_opening_data(prep)
-	var openings: Array = _floor_openings(body)
+	var openings: Array = ElementGeometry.floor_openings(body)
 	openings.append(stored)
 	body.set_meta("openings", openings)
-	_rebuild_floor_geom(body)
+	ElementGeometry.rebuild_floor_geom(body)
 	dirty = true
 	return {"ok": true, "clamped": bool(prep.get("clamped", false)), "opening": stored}
 
@@ -709,12 +401,12 @@ func add_floor_opening(body: StaticBody3D, x0: float, x1: float, z0: float, z1: 
 func remove_floor_opening(body: StaticBody3D, index: int) -> void:
 	if body == null or not is_instance_valid(body) or not body.has_meta("openings"):
 		return
-	var openings: Array = _floor_openings(body)
+	var openings: Array = ElementGeometry.floor_openings(body)
 	if index < 0 or index >= openings.size():
 		return
 	openings.remove_at(index)
 	body.set_meta("openings", openings)
-	_rebuild_floor_geom(body)
+	ElementGeometry.rebuild_floor_geom(body)
 	dirty = true
 
 
@@ -722,7 +414,7 @@ func set_floor_openings(body: StaticBody3D, openings: Array) -> void:
 	if body == null or not is_instance_valid(body):
 		return
 	body.set_meta("openings", _sanitize_floor_openings(openings))
-	_rebuild_floor_geom(body)
+	ElementGeometry.rebuild_floor_geom(body)
 	dirty = true
 
 func place_stair(center: Vector3, width: float, length: float, height: float, yaw: float, material: String = "") -> StaticBody3D:
@@ -733,8 +425,8 @@ func place_stair(center: Vector3, width: float, length: float, height: float, ya
 	body.rotation.y = yaw
 	body.collision_layer = 1
 	body.collision_mask = 0
-	var mat := _surface_mat(mat_id)
-	attach_stair_geom(body, width, length, height, mat, true)
+	var mat := ElementGeometry.surface_mat(mat_id)
+	ElementGeometry.attach_stair_geom(body, width, length, height, mat, true)
 	var size := Vector3(width, height, length)
 	body.set_meta("kind", "stair")
 	body.set_meta("size", size)
@@ -751,52 +443,9 @@ func place_stair(center: Vector3, width: float, length: float, height: float, ya
 	dirty = true
 	return body
 
-static func stair_step_count(height: float) -> int:
-	return maxi(1, int(round(maxf(height, 0.2) / Config.STAIR_RISE)))
-
-## 在 parent 局部空间生成踏步网格；with_collision 时附加踏步盒 + 坡面凸包。
+## 兼容转发：几何生成已移至 ElementGeometry，保留静态入口供楼梯预览工具调用。
 static func attach_stair_geom(parent: Node3D, width: float, length: float, height: float, mat: Material, with_collision: bool) -> void:
-	var n := stair_step_count(height)
-	var rise := height / float(n)
-	var tread := length / float(n)
-	for i in n:
-		var mi := MeshInstance3D.new()
-		mi.name = "Step_%d" % i
-		var bm := BoxMesh.new()
-		bm.size = Vector3(width, rise, tread)
-		if mat != null:
-			bm.material = mat
-		mi.mesh = bm
-		mi.position = Vector3(
-			0.0,
-			-height * 0.5 + (float(i) + 0.5) * rise,
-			length * 0.5 - (float(i) + 0.5) * tread)
-		parent.add_child(mi)
-		if with_collision:
-			var cs := CollisionShape3D.new()
-			cs.name = "StepCol_%d" % i
-			var bs := BoxShape3D.new()
-			bs.size = bm.size
-			cs.shape = bs
-			cs.position = mi.position
-			parent.add_child(cs)
-	if with_collision:
-		var ramp := CollisionShape3D.new()
-		ramp.name = "RampCol"
-		var conv := ConvexPolygonShape3D.new()
-		var hw := width * 0.5
-		var hl := length * 0.5
-		var hh := height * 0.5
-		conv.points = PackedVector3Array([
-			Vector3(-hw, -hh, hl),
-			Vector3(hw, -hh, hl),
-			Vector3(-hw, -hh, -hl),
-			Vector3(hw, -hh, -hl),
-			Vector3(-hw, hh, -hl),
-			Vector3(hw, hh, -hl),
-		])
-		ramp.shape = conv
-		parent.add_child(ramp)
+	ElementGeometry.attach_stair_geom(parent, width, length, height, mat, with_collision)
 
 ## 楼梯最高踏步顶面四角（世界坐标），供地板磁吸。
 static func stair_top_corners(obj: StaticBody3D) -> Array:
@@ -804,7 +453,7 @@ static func stair_top_corners(obj: StaticBody3D) -> Array:
 	var length := float(obj.get_meta("length"))
 	var height := float(obj.get_meta("height"))
 	var yaw := float(obj.get_meta("yaw")) if obj.has_meta("yaw") else 0.0
-	var n := stair_step_count(height)
+	var n := ElementGeometry.stair_step_count(height)
 	var tread := length / float(n)
 	var c: Vector3 = obj.global_position
 	var dx := Vector3(cos(yaw), 0.0, -sin(yaw))
@@ -851,10 +500,10 @@ func snap_corners_of(obj: StaticBody3D) -> Array:
 func set_body_material(body: StaticBody3D, material_id: String) -> void:
 	if body == null or not is_instance_valid(body):
 		return
-	if not body.has_meta("kind") or not MATERIAL_KINDS.has(body.get_meta("kind")):
+	if not body.has_meta("kind") or not Kinds.MATERIAL_KINDS.has(body.get_meta("kind")):
 		return
 	var mat_id := Config.normalize_material(material_id)
-	var mat := _surface_mat(mat_id)
+	var mat := ElementGeometry.surface_mat(mat_id)
 	body.set_meta("material", mat_id)
 	body.set_meta("color", mat.albedo_color)
 	dirty = true
@@ -875,7 +524,7 @@ func set_body_dims(body: StaticBody3D, dims: Dictionary) -> void:
 	if not body.has_meta("kind"):
 		return
 	var kind: String = body.get_meta("kind")
-	if not MATERIAL_KINDS.has(kind):
+	if not Kinds.MATERIAL_KINDS.has(kind):
 		return
 	var old_size: Vector3 = body.get_meta("size")
 	var yaw: float = float(body.get_meta("yaw")) if body.has_meta("yaw") else 0.0
@@ -903,7 +552,7 @@ func set_body_dims(body: StaticBody3D, dims: Dictionary) -> void:
 					if typeof(op_v) == TYPE_DICTIONARY:
 						ops.append(_opening_data(_clamp_opening(new_size, op_v)))
 				body.set_meta("openings", ops)
-			_rebuild_wall_geom(body)
+			ElementGeometry.rebuild_wall_geom(body)
 			dirty = true
 			return
 		"floor_tile":
@@ -916,7 +565,7 @@ func set_body_dims(body: StaticBody3D, dims: Dictionary) -> void:
 			body.set_meta("size", new_size)
 			if not body.has_meta("pieces"):
 				body.set_meta("pieces", _xz_rect_from_box(pos, new_size))
-			_rebuild_floor_geom(body)
+			ElementGeometry.rebuild_floor_geom(body)
 			dirty = true
 			return
 		"stair":
@@ -937,7 +586,7 @@ func set_body_dims(body: StaticBody3D, dims: Dictionary) -> void:
 			body.set_meta("width", nw)
 			body.set_meta("length", nl)
 			body.set_meta("height", nh)
-			_rebuild_stair_geom(body, nw, nl, nh)
+			ElementGeometry.rebuild_stair_geom(body, nw, nl, nh)
 			dirty = true
 			return
 		_:
@@ -954,21 +603,6 @@ func set_body_dims(body: StaticBody3D, dims: Dictionary) -> void:
 		elif child is CollisionShape3D and child.shape is BoxShape3D:
 			(child.shape as BoxShape3D).size = new_size
 			child.rotation.y = yaw
-
-func _rebuild_stair_geom(body: StaticBody3D, width: float, length: float, height: float) -> void:
-	var to_free: Array = []
-	for child in body.get_children():
-		if String(child.name) == "_SelectHL":
-			continue
-		if child is MeshInstance3D or child is CollisionShape3D:
-			to_free.append(child)
-	for n in to_free:
-		body.remove_child(n)
-		n.free()
-	var mat_id := Config.DEFAULT_MATERIAL
-	if body.has_meta("material"):
-		mat_id = Config.normalize_material(String(body.get_meta("material")))
-	attach_stair_geom(body, width, length, height, _surface_mat(mat_id), true)
 
 ## 删除已放置物体：从仓库登记中移除并销毁节点。
 func remove(body: StaticBody3D) -> void:
@@ -1117,41 +751,6 @@ func _add_leader(body: StaticBody3D, size: Vector3) -> void:
 	leader.mesh = line
 	leader.visible = labels_visible
 	body.add_child(leader)
-
-func _clay_mat(color: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.albedo_color = color
-	m.roughness = 0.9
-	m.metallic = 0.0
-	return m
-
-## 窗洞玻璃：半透明冷青、可透视、双面、低粗糙、无金属。无碰撞。
-func _glass_mat() -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.blend_mode = BaseMaterial3D.BLEND_MODE_MIX
-	m.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
-	m.albedo_color = Config.COLOR_WINDOW_GLASS
-	m.roughness = 0.06
-	m.metallic = 0.0
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	m.refraction_enabled = false
-	return m
-
-## 柱/墙/地板共用材质外观：混凝土冷灰 / 泥土棕。
-func _surface_mat(material: String) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.metallic = 0.0
-	if Config.normalize_material(material) == "dirt":
-		m.albedo_color = Config.COLOR_FLOOR_DIRT
-		m.roughness = 0.95
-	else:
-		m.albedo_color = Config.COLOR_FLOOR_CONCRETE
-		m.roughness = 0.85
-	return m
-
-func _floor_mat(material: String) -> StandardMaterial3D:
-	return _surface_mat(material)
 
 func toggle_labels() -> void:
 	labels_visible = not labels_visible
@@ -1387,7 +986,7 @@ func pick_opening(origin: Vector3, dir: Vector3, max_dist: float) -> Dictionary:
 			var op_v: Variant = ops[i]
 			if typeof(op_v) != TYPE_DICTIONARY:
 				continue
-			var b := _opening_local_bounds(size, op_v)
+			var b := RectOps.opening_local_bounds(size, op_v)
 			var bmin := Vector3(float(b["x0"]), float(b["y0"]), -hz)
 			var bmax := Vector3(float(b["x1"]), float(b["y1"]), hz)
 			var t := _ray_aabb_t(lo, ld, bmin, bmax)
@@ -1437,7 +1036,7 @@ func add_wall_opening(body: StaticBody3D, typ: String, width: float, height: flo
 		return {"ok": false, "clamped": bool(op.get("clamped", false))}
 	openings.append(stored)
 	body.set_meta("openings", openings)
-	_rebuild_wall_geom(body)
+	ElementGeometry.rebuild_wall_geom(body)
 	dirty = true
 	return {"ok": true, "clamped": bool(op.get("clamped", false)), "opening": stored}
 
@@ -1449,7 +1048,7 @@ func remove_wall_opening(body: StaticBody3D, index: int) -> void:
 		return
 	openings.remove_at(index)
 	body.set_meta("openings", openings)
-	_rebuild_wall_geom(body)
+	ElementGeometry.rebuild_wall_geom(body)
 	dirty = true
 
 func set_wall_openings(body: StaticBody3D, openings: Array) -> void:
@@ -1462,7 +1061,7 @@ func set_wall_openings(body: StaticBody3D, openings: Array) -> void:
 			continue
 		copy.append(_opening_data(_clamp_opening(size, op_v)))
 	body.set_meta("openings", copy)
-	_rebuild_wall_geom(body)
+	ElementGeometry.rebuild_wall_geom(body)
 	dirty = true
 
 func opening_world_box(body: StaticBody3D, op: Dictionary) -> Dictionary:
@@ -1479,7 +1078,7 @@ func opening_world_box(body: StaticBody3D, op: Dictionary) -> Dictionary:
 		}
 	var size: Vector3 = body.get_meta("size")
 	var yaw := float(body.get_meta("yaw")) if body.has_meta("yaw") else 0.0
-	var b := _opening_local_bounds(size, op)
+	var b := RectOps.opening_local_bounds(size, op)
 	var u := (float(b["x0"]) + float(b["x1"])) * 0.5
 	var y := (float(b["y0"]) + float(b["y1"])) * 0.5
 	var along := Vector3(cos(yaw), 0.0, -sin(yaw))
@@ -1501,24 +1100,6 @@ func _opening_data(op: Dictionary) -> Dictionary:
 		"u": float(op.get("u", 0.0)),
 	}
 
-func _opening_local_bounds(size: Vector3, op: Dictionary) -> Dictionary:
-	var w := maxf(float(op.get("width", Config.DOOR_WIDTH)), 0.05)
-	var h := maxf(float(op.get("height", Config.DOOR_HEIGHT)), 0.05)
-	var s := maxf(float(op.get("sill", 0.0)), 0.0)
-	var u := float(op.get("u", 0.0))
-	var typ := String(op.get("type", "door"))
-	var hy := size.y * 0.5
-	var floor_y := -hy + Config.EMBED
-	var y0 := floor_y + s
-	var y1 := y0 + h
-	if typ == "door" or s <= 0.001:
-		y0 = -hy
-	return {
-		"x0": u - w * 0.5,
-		"x1": u + w * 0.5,
-		"y0": y0,
-		"y1": y1,
-	}
 
 func _clamp_opening(size: Vector3, op: Dictionary) -> Dictionary:
 	var typ := String(op.get("type", "door"))
@@ -1565,206 +1146,10 @@ func _clamp_opening(size: Vector3, op: Dictionary) -> Dictionary:
 		"clamped": clamped,
 	}
 
-func _clear_body_geom(body: StaticBody3D) -> void:
-	var to_free: Array = []
-	for child in body.get_children():
-		var n := String(child.name)
-		if n == "_SelectHL" or n == "Label" or n == "Leader":
-			continue
-		if child is MeshInstance3D or child is CollisionShape3D:
-			to_free.append(child)
-	for node in to_free:
-		body.remove_child(node)
-		node.free()
-
-func _rebuild_wall_geom(body: StaticBody3D) -> void:
-	_clear_body_geom(body)
-	var size: Vector3 = body.get_meta("size")
-	var yaw := float(body.get_meta("yaw")) if body.has_meta("yaw") else 0.0
-	var mat_id := Config.DEFAULT_MATERIAL
-	if body.has_meta("material"):
-		mat_id = Config.normalize_material(String(body.get_meta("material")))
-	var mat := _surface_mat(mat_id)
-	body.set_meta("color", mat.albedo_color)
-	var openings: Array = []
-	if body.has_meta("openings"):
-		openings = body.get_meta("openings")
-	var pieces: Array = _wall_leftover_boxes(size, openings)
-	if pieces.is_empty() and openings.is_empty():
-		pieces = [{"pos": Vector3.ZERO, "size": size}]
-	var along := Vector3(cos(yaw), 0.0, -sin(yaw))
-	var across := Vector3(sin(yaw), 0.0, cos(yaw))
-	for i in pieces.size():
-		var piece: Dictionary = pieces[i]
-		var psz: Vector3 = piece["size"]
-		var lp: Vector3 = piece["pos"]
-		var pos := along * lp.x + Vector3(0.0, lp.y, 0.0) + across * lp.z
-		var mi := MeshInstance3D.new()
-		mi.name = "WallPiece_%d" % i
-		var bm := BoxMesh.new()
-		bm.size = psz
-		bm.material = mat
-		mi.mesh = bm
-		mi.position = pos
-		mi.rotation.y = yaw
-		body.add_child(mi)
-		var cs := CollisionShape3D.new()
-		cs.name = "WallCol_%d" % i
-		var bs := BoxShape3D.new()
-		bs.size = psz
-		cs.shape = bs
-		cs.position = pos
-		cs.rotation.y = yaw
-		body.add_child(cs)
-	_attach_window_panes(body, size, yaw, openings, along, across)
-
-func _attach_window_panes(body: StaticBody3D, size: Vector3, yaw: float, openings: Array, along: Vector3, across: Vector3) -> void:
-	var glass := _glass_mat()
-	var gi := 0
-	for op_v in openings:
-		if typeof(op_v) != TYPE_DICTIONARY:
-			continue
-		if String(op_v.get("type", "door")) != "window":
-			continue
-		var b := _opening_local_bounds(size, op_v)
-		var gw := float(b["x1"]) - float(b["x0"])
-		var gh := float(b["y1"]) - float(b["y0"])
-		if gw < 0.001 or gh < 0.001:
-			continue
-		var gt := minf(Config.WINDOW_GLASS_THICKNESS, maxf(size.z * 0.25, 0.01))
-		var lp := Vector3(
-			(float(b["x0"]) + float(b["x1"])) * 0.5,
-			(float(b["y0"]) + float(b["y1"])) * 0.5,
-			0.0)
-		var pos := along * lp.x + Vector3(0.0, lp.y, 0.0) + across * lp.z
-		var mi := MeshInstance3D.new()
-		mi.name = "WindowGlass_%d" % gi
-		var bm := BoxMesh.new()
-		bm.size = Vector3(gw, gh, gt)
-		bm.material = glass
-		mi.mesh = bm
-		mi.position = pos
-		mi.rotation.y = yaw
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		body.add_child(mi)
-		gi += 1
-
+## 墙开洞后的剩余实体块。纯几何，见 RectOps。
 func _wall_leftover_boxes(size: Vector3, openings: Array) -> Array:
-	var hx := size.x * 0.5
-	var hy := size.y * 0.5
-	var xs: Array = [-hx, hx]
-	var ys: Array = [-hy, hy]
-	var rects: Array = []
-	for op_v in openings:
-		if typeof(op_v) != TYPE_DICTIONARY:
-			continue
-		var b := _opening_local_bounds(size, op_v)
-		var x0 := float(b["x0"])
-		var x1 := float(b["x1"])
-		var y0 := float(b["y0"])
-		var y1 := float(b["y1"])
-		if x1 - x0 < 0.001 or y1 - y0 < 0.001:
-			continue
-		xs.append(x0)
-		xs.append(x1)
-		ys.append(y0)
-		ys.append(y1)
-		rects.append({"x0": x0, "x1": x1, "y0": y0, "y1": y1})
-	xs.sort()
-	ys.sort()
-	var ux := _unique_floats(xs)
-	var uy := _unique_floats(ys)
-	if ux.size() < 2 or uy.size() < 2:
-		return []
-	var nx := ux.size() - 1
-	var ny := uy.size() - 1
-	var solid: Array = []
-	for i in nx:
-		var row: Array = []
-		for j in ny:
-			var cx := (ux[i] + ux[i + 1]) * 0.5
-			var cy := (uy[j] + uy[j + 1]) * 0.5
-			var hole := false
-			for r in rects:
-				if cx > float(r["x0"]) + 0.0002 and cx < float(r["x1"]) - 0.0002 						and cy > float(r["y0"]) + 0.0002 and cy < float(r["y1"]) - 0.0002:
-					hole = true
-					break
-			row.append(not hole)
-		solid.append(row)
-	var used: Array = []
-	for i in nx:
-		var urow: Array = []
-		for j in ny:
-			urow.append(false)
-		used.append(urow)
-	var out: Array = []
-	for j in ny:
-		for i in nx:
-			if not solid[i][j] or used[i][j]:
-				continue
-			var i2 := i
-			while i2 + 1 < nx and solid[i2 + 1][j] and not used[i2 + 1][j]:
-				i2 += 1
-			var j2 := j
-			while j2 + 1 < ny:
-				var ok := true
-				for ii in range(i, i2 + 1):
-					if not solid[ii][j2 + 1] or used[ii][j2 + 1]:
-						ok = false
-						break
-				if not ok:
-					break
-				j2 += 1
-			for ii in range(i, i2 + 1):
-				for jj in range(j, j2 + 1):
-					used[ii][jj] = true
-			var x0b := ux[i]
-			var x1b := ux[i2 + 1]
-			var y0b := uy[j]
-			var y1b := uy[j2 + 1]
-			var pw := x1b - x0b
-			var ph := y1b - y0b
-			if pw < 0.001 or ph < 0.001:
-				continue
-			out.append({
-				"pos": Vector3((x0b + x1b) * 0.5, (y0b + y1b) * 0.5, 0.0),
-				"size": Vector3(pw, ph, size.z),
-			})
-	return out
+	return RectOps.wall_leftover_boxes(size, openings)
 
-func _unique_floats(vals: Array) -> PackedFloat32Array:
-	var out := PackedFloat32Array()
-	for v in vals:
-		var f := float(v)
-		if out.is_empty() or absf(f - out[out.size() - 1]) > 0.0005:
-			out.append(f)
-	return out
-
+## 射线与 AABB 相交最近命中 t（未命中/背离返回 INF）。纯几何，见 RectOps。
 func _ray_aabb_t(o: Vector3, d: Vector3, bmin: Vector3, bmax: Vector3) -> float:
-	var tmin := -INF
-	var tmax := INF
-	for i in 3:
-		var origin_i := o[i]
-		var dir_i := d[i]
-		var min_i := bmin[i]
-		var max_i := bmax[i]
-		if absf(dir_i) < 0.0000001:
-			if origin_i < min_i or origin_i > max_i:
-				return INF
-			continue
-		var inv := 1.0 / dir_i
-		var t0 := (min_i - origin_i) * inv
-		var t1 := (max_i - origin_i) * inv
-		if t0 > t1:
-			var tmp := t0
-			t0 = t1
-			t1 = tmp
-		tmin = maxf(tmin, t0)
-		tmax = minf(tmax, t1)
-		if tmax < tmin:
-			return INF
-	if tmax < 0.0:
-		return INF
-	if tmin >= 0.0:
-		return tmin
-	return 0.0
+	return RectOps.ray_aabb_t(o, d, bmin, bmax)

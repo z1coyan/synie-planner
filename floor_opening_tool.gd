@@ -1,17 +1,9 @@
 class_name FloorOpeningTool
-extends Node3D
+extends PlacementToolBase
 
 ## 地板开洞：瞄准地板预览矩形洞口，单击切割。洞口可吸附地板/已有地洞/墙顶/梯顶角点。
 ## F1 改下次开洞默认尺寸。右键退回「无」。
 
-signal exit_requested
-
-var world: WorldStore
-var camera_rig: CameraController
-var hud: Hud
-var host: Node
-
-var active := false
 var hole_width := Config.FLOOR_HOLE_WIDTH
 var hole_length := Config.FLOOR_HOLE_LENGTH
 
@@ -36,23 +28,9 @@ func setup(w: WorldStore, cc: CameraController, h: Hud, main_host: Node) -> void
 	host = main_host
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
-	_preview_root = Node3D.new()
-	_preview_root.name = "FloorOpeningPreview"
-	_preview_root.visible = false
-	add_child(_preview_root)
+	_preview_root = _make_preview_root("FloorOpeningPreview")
 	_fill_mi = MeshInstance3D.new()
 	_preview_root.add_child(_fill_mi)
-
-func _holo_mat(base: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = base
-	m.emission_enabled = true
-	var e := base
-	e.a = 1.0
-	m.emission = e
-	return m
 
 func set_active(a: bool) -> void:
 	active = a
@@ -64,11 +42,21 @@ func set_active(a: bool) -> void:
 		return
 	_update_hud()
 
-func refresh_hud() -> void:
+## 参数变更后的 HUD 刷新（地洞无材质，参数即尺寸）。
+func refresh_param_hud() -> void:
 	_update_hud()
 
-func _dialog_open() -> bool:
-	return host != null and host.has_method("is_any_dialog_open") and host.is_any_dialog_open()
+## 外部兼容：原 refresh_hud 入口保留，转发到 refresh_param_hud。
+func refresh_hud() -> void:
+	refresh_param_hud()
+
+## 地洞无材质：材质 id 恒为空。
+func get_material_id() -> String:
+	return ""
+
+## 地洞无材质：忽略材质写入。
+func set_material_id(_m: String) -> void:
+	pass
 
 func _physics_process(_delta: float) -> void:
 	if not active:

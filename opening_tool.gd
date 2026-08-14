@@ -1,17 +1,9 @@
 class_name OpeningTool
-extends Node3D
+extends PlacementToolBase
 
 ## 门洞 / 窗洞：瞄准墙面预览开洞矩形，单击切割。F1 改下次开洞默认尺寸。右键退回「无」。
 
-signal exit_requested
-
-var world: WorldStore
-var camera_rig: CameraController
-var hud: Hud
-var host: Node
-
 var opening_type := "door"
-var active := false
 var width := Config.DOOR_WIDTH
 var height := Config.DOOR_HEIGHT
 var sill := Config.DOOR_SILL
@@ -46,26 +38,12 @@ func setup(w: WorldStore, cc: CameraController, h: Hud, main_host: Node, p_type:
 		sill = Config.DOOR_SILL
 	_fill_mat_ok = _holo_mat(Config.COLOR_OK)
 	_fill_mat_bad = _holo_mat(Config.COLOR_BAD)
-	_preview_root = Node3D.new()
-	_preview_root.name = "OpeningPreview"
-	_preview_root.visible = false
-	add_child(_preview_root)
+	_preview_root = _make_preview_root("OpeningPreview")
 	_fill_mi = MeshInstance3D.new()
 	_preview_root.add_child(_fill_mi)
 
 func type_label() -> String:
 	return "窗洞" if opening_type == "window" else "门洞"
-
-func _holo_mat(base: Color) -> StandardMaterial3D:
-	var m := StandardMaterial3D.new()
-	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	m.albedo_color = base
-	m.emission_enabled = true
-	var e := base
-	e.a = 1.0
-	m.emission = e
-	return m
 
 func set_active(a: bool) -> void:
 	active = a
@@ -77,11 +55,21 @@ func set_active(a: bool) -> void:
 		return
 	_update_hud()
 
-func refresh_hud() -> void:
+## 参数变更后的 HUD 刷新（开洞无材质，参数即尺寸）。
+func refresh_param_hud() -> void:
 	_update_hud()
 
-func _dialog_open() -> bool:
-	return host != null and host.has_method("is_any_dialog_open") and host.is_any_dialog_open()
+## 外部兼容：原 refresh_hud 入口保留，转发到 refresh_param_hud。
+func refresh_hud() -> void:
+	refresh_param_hud()
+
+## 开洞无材质：材质 id 恒为空。
+func get_material_id() -> String:
+	return ""
+
+## 开洞无材质：忽略材质写入。
+func set_material_id(_m: String) -> void:
+	pass
 
 func _physics_process(_delta: float) -> void:
 	if not active:
